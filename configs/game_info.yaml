@@ -15,3 +15,18 @@ keybinds:
   dash: lshift
   heal: l
   skill: k
+menu:
+  keys:
+    pause: esc
+    confirm: space
+    cancel: esc
+    down: s
+    up: w
+  delays:
+    after_pause: 0.8
+    after_nav: 0.3
+    after_main_menu: 2.5
+    after_continue: 4.0
+    after_load_stable: 1.0
+  nav_to_main_menu:
+    down: 2
