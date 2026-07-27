@@ -48,13 +48,14 @@
 |------|-----|
 | 阶段 | **Phase 0 — 真环境探针** |
 | 子课 | **第 4 课：session + probe_loop（菜单重置 ×10）** |
-| 完成 | L1 B✅ · L2/L3 A 就绪 **B 待验收** · L4 进行中 |
-| 阻塞 | HP 偏移未 B 验；神居进度/DLC；菜单 `delays` 需 B 机调 |
+| 完成 | L1 B✅ · L2 B✅ · L3 B✅ · L4 进行中 |
+| 阻塞 | 神居进度/DLC；菜单 `delays` 需 B 机调 |
 | 更新 | 2026-07-27 |
 
 **Phase 0 待办（B 机）**
 
-- [ ] `probe_hp` / `probe_input` 验收
+- [x] `probe_hp` 验收（B，2026-07-23）
+- [x] `probe_input` 验收（B，2026-07-27）
 - [ ] `probe_loop` ×10 + `results/phase0.md`
 - [ ] WSL/ROCm（Phase 1 前，可后置）
 
@@ -82,8 +83,6 @@ python scripts\probe_loop.py
 # 10 次无卡死；HP 一致；人眼同起点 → 写 results/phase0.md
 ```
 
-**B 机待补**：`probe_attach` / `probe_hp` / `probe_input`。
-
 ### Phase 1 备忘（现在不写）
 
 - DebugMod + BepInEx → `ModResetBackend`；采集 `--reset-backend mod`，评估强制 `menu`
@@ -110,6 +109,7 @@ data/  artifacts/  results/
 
 | 日期 | 事件 |
 |------|------|
+| 2026-07-27 | L3 B 验收：`probe_input` 按键注入通过 |
 | 2026-07-27 | **AGENTS.md 精简**（555→~100 行，见文首说明）；架构：神居+菜单评估 / Mod 训练加速；L3 A 就绪 |
-| 2026-07-23 | L2 A 就绪：`PlayerInfo` + `probe_hp` |
+| 2026-07-23 | L2 B 验收：`probe_hp`；A 就绪 `PlayerInfo` + `probe_hp` |
 | 2026-07-21 | L1 B 验收；B 环境就绪 |

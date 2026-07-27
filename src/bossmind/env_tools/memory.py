@@ -77,11 +77,11 @@ class PlayerInfo:
             module_addr = int(
                 pymem.process.module_from_name(pm.process_handle, module_base).lpBaseOfDll
             )
-            addr = module_addr + int(base_offset)
+            addr = int(pm.read_ulonglong(module_addr + int(base_offset)))
             # 遍历偏移链
             for i, offset in enumerate(offsets):
                 # 先偏移地址，再读取8字节，获取指针。
-                addr = int(pm.read_longlong(int(addr + int(offset))))
+                addr = int(pm.read_ulonglong(int(addr + int(offset))))
                 # 判断偏移链是否断裂
                 if addr == 0:
                     raise ValueError(f"偏移链断裂: {hex(addr)}，当前为第{i + 1}层")
