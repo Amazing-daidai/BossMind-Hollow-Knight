@@ -23,7 +23,7 @@
 | 项 | 内容 |
 |----|------|
 | 目标 | 神居 Pantheon 单 Boss **速通/无伤**；BC + LLM Option + 局外训练师（弱融合） |
-| 评估场景 | Hall of Gods；MVP：**Pantheon 1 + Attuned**（`game_info.yaml` → `godhome`） |
+| 评估场景 | Hall of Gods；MVP：**Pantheon 1 + Attuned** |
 | 重置 | **评估/演示** = 菜单读档（无 mod）；**训练采数** = DebugMod SL（Phase 1） |
 | 不做 | 大地图 Boss 主线、LLM 每帧按键、战斗内热更新权重 |
 | 协作 | 用户自写代码；Agent 师父模式（思路/审代码/排错，不代写整模块） |
@@ -47,61 +47,100 @@
 | 字段 | 值 |
 |------|-----|
 | 阶段 | **Phase 0 — 真环境探针** |
-| 子课 | **第 4 课：session + probe_loop（菜单重置 ×10）** |
-| 完成 | L1 B✅ · L2 B✅ · L3 B✅ · L4 进行中 |
-| 阻塞 | 神居进度/DLC；菜单 `delays` 需 B 机调 |
-| 更新 | 2026-07-27 |
+| 子课 | **第 4 课 B 机验收（今晚）** |
+| 完成 | L1–L3 B✅；**L4 A 代码就绪**（审阅通过） |
+| 阻塞 | 菜单 delay / 神居寻路事件需 B 机对着实机调；`Mod` 仍为占位 |
+| 更新 | 2026-07-29 |
 
-**Phase 0 待办（B 机）**
+**Phase 0 清单**
 
-- [x] `probe_hp` 验收（B，2026-07-23）
-- [x] `probe_input` 验收（B，2026-07-27）
-- [ ] `probe_loop` ×10 + `results/phase0.md`
+- [x] L1 `probe_attach`（B）
+- [x] L2 `probe_hp`（B）
+- [x] L3 `probe_input`（B）
+- [x] L4 A：`session.py` + `reset_backends/menu.py` + `probe_loop.py` + yaml `menu`
+- [ ] L4 B：`probe_loop` ×10 + `results/phase0.md` ← **当前**
 - [ ] WSL/ROCm（Phase 1 前，可后置）
 
 ---
 
-## 3. 下一步
+## 3. 下一步（设备 B · 今晚）
 
-### 第 4 课（当前）
-
-**目标**：神居固定存档点 → `GameSession.reset()`（菜单轨）×10 → 每次打印时间戳 + HP。
+### 前置
 
 ```text
-session.reset()
-  ├── MenuResetBackend   # 现在实现；评估/演示只用这个
-  └── ModResetBackend    # Phase 1；DebugMod 热键
+git pull
+cd /d E:\BossMind
+conda activate BossMind
+pip install -e .
 ```
 
-| 设备 | 任务 |
-|------|------|
-| A | `session.py` + `reset_backends/menu.py` + `probe_loop.py`；yaml 加 `menu`、`godhome` |
-| B | 神居门口存档 → 手操菜单路径 → 调 `menu.delays` → 验收 |
+- 游戏：**窗口化 / 无边框**；关自动更新  
+- 存档：能「继续」进到与 yaml 寻路匹配的起点（当前配置名 `godhome_boss_room.hornet`）  
+- 键位与 `game_info.yaml` → `keybinds` 一致（确认键目前用 `jump`=space）
+
+### 跑验收
 
 ```text
 python scripts\probe_loop.py
-# 10 次无卡死；HP 一致；人眼同起点 → 写 results/phase0.md
+# 5 秒内点到游戏窗口
+# 期望：×10 菜单读档 + goto；每次 HP 与基线一致；无 traceback
 ```
+
+流程（代码已实现）：
+
+```text
+load_save → attach → goto(hornet) → 记 baseline HP
+×10: reset(menu) → attach → goto → 对比 HP
+finally: detach
+```
+
+### 调参（卡了再改 yaml，少改代码）
+
+| 现象 | 改哪里 |
+|------|--------|
+| 退不出游戏 / 选错菜单 | `menu.quit_to_title.event` 的键与 delay |
+| 标题「继续」失败 | `menu.load_save.event` |
+| 走到错误位置 | `menu.godhome_boss_room.hornet.event` |
+| 读档后 HP 失败 | 确认 `attach` 在 reset 后执行（脚本已有）；偏移见 L2 |
+
+### 验收通过后
+
+1. 写 `results/phase0.md`（日期、窗口模式、平均耗时、10 次是否全 match）  
+2. 更新本文件 §2（L4 B✅）+ §5 里程碑  
+3. `commit` + `push` → Phase 0 收官，下轮 Phase 1  
 
 ### Phase 1 备忘（现在不写）
 
-- DebugMod + BepInEx → `ModResetBackend`；采集 `--reset-backend mod`，评估强制 `menu`
-- 训练数据：Windows 采集 → WSL `~/bossmind-train/` ext4 缓存（**勿**每 epoch 扫 `/mnt/e`）
-- 发布：`artifacts/published/<run_id>/`；评估只读 published
+- DebugMod → `Mod.reset_game`；采集用 mod，评估强制 menu  
+- 训练：Windows 采集 → WSL `~/bossmind-train/` ext4（勿每 epoch 扫 `/mnt/e`）
 
 ---
 
-## 4. 仓库
+## 4. 仓库（L4 现状）
 
 ```text
-configs/game_info.yaml      # process_name, player_info, keybinds, menu, godhome
-scripts/probe_{attach,hp,input,loop}.py
-src/bossmind/env_tools/{memory,input,session}.py
-src/bossmind/env_tools/reset_backends/{base,menu,mod}.py
-data/  artifacts/  results/
+configs/game_info.yaml
+  # process_name, player_info, keybinds
+  # menu.quit_to_title / load_save / godhome_boss_room.hornet
+scripts/probe_{attach,hp,input,loop}.py     # ✅
+src/bossmind/env_tools/
+  memory.py  input.py  session.py           # ✅
+  reset_backends/menu.py                    # ✅ 菜单读档
+  reset_backends/mod.py                     # ☐ 空壳，Phase 1
+results/phase0.md                           # ☐ B 验收后写
 ```
 
-安装：`pip install -e .` · 偏移与键位进 YAML · 配置经 `paths.GAME_INFO_FILE`
+安装：`pip install -e .` · 配置经 `paths.GAME_INFO_FILE`
+
+**API 摘要**
+
+| 类/脚本 | 作用 |
+|---------|------|
+| `PlayerInfo` | attach / 读 HP / detach |
+| `InputController` | tap / press / hold / `run_action` |
+| `Menu` | `quit_to_title` / `load_save` / `goto_boss_room` / `reset_game` |
+| `GameSession` | 组装上三者；`reset_game("menu"|"mod")` |
+| `probe_loop.py` | ×10 验收入口 |
 
 ---
 
@@ -109,7 +148,8 @@ data/  artifacts/  results/
 
 | 日期 | 事件 |
 |------|------|
-| 2026-07-27 | L3 B 验收：`probe_input` 按键注入通过 |
-| 2026-07-27 | **AGENTS.md 精简**（555→~100 行，见文首说明）；架构：神居+菜单评估 / Mod 训练加速；L3 A 就绪 |
-| 2026-07-23 | L2 B 验收：`probe_hp`；A 就绪 `PlayerInfo` + `probe_hp` |
+| 2026-07-29 | **L4 A 就绪**：session + Menu 读档 + probe_loop；待 B 验收 |
+| 2026-07-28 | 进度同步：L1–L3 B 验收完成 |
+| 2026-07-27 | L3 B 验收；AGENTS.md 精简；双轨重置架构定稿 |
+| 2026-07-23 | L2 B 验收 |
 | 2026-07-21 | L1 B 验收；B 环境就绪 |

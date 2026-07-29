@@ -15,18 +15,22 @@ keybinds:
   dash: lshift
   heal: l
   skill: k
+  esc: esc
 menu:
-  keys:
-    pause: esc
-    confirm: space
-    cancel: esc
-    down: s
-    up: w
-  delays:
-    after_pause: 0.8
-    after_nav: 0.3
-    after_main_menu: 2.5
-    after_continue: 4.0
-    after_load_stable: 1.0
-  nav_to_main_menu:
-    down: 2
+  quit_to_title:
+    event:
+      - [esc, 0.1]
+      - [up, 0.0]
+      - [jump, 0.1]
+      - [jump, 5.0]
+  load_save:
+    event:
+      - [jump, 0.5]
+      - [jump, 5.0]
+  godhome_boss_room:
+    hornet:
+      event:
+        - right: [press, 5.0, 0.0]
+        - jump: [hold, 5.0, 1.0]
+        - right: [release, 0.0, 0.0]
+

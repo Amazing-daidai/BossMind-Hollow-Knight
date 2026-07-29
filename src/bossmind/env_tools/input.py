@@ -9,6 +9,9 @@ from bossmind.paths import GAME_INFO_FILE
 logger = logging.getLogger(__name__)
 
 class InputController:
+    """
+    用于按键输入
+    """
     def __init__(self):
         self._keybinds = None  # 按键字典
         pydirectinput.PAUSE = 0.03
@@ -66,7 +69,7 @@ class InputController:
         self.release_key(name)
     
     # 按一下并抬起按键
-    def press_key_once(self, name: str):
+    def tap(self, name: str):
         """
         用于按一下并抬起按键
         """
@@ -74,7 +77,27 @@ class InputController:
         pydirectinput.press(key)
         logger.debug(f"press {name} ({key})")
 
+    # 执行具体操作
+    def run_action(self, action: str, key: str, delay: float, duration: float = 1.0):
+        """
+        用于执行具体操作
+        """
+        if action == "press":
+            self.press_key(key)
+            time.sleep(delay)
+        elif action == "tap":
+            self.tap(key)
+            time.sleep(delay)
+        elif action == "release":
+            self.release_key(key)
+            time.sleep(delay)
+        elif action == "hold":
+            self.hold_key(key, duration)
+            time.sleep(delay)
+        else:
+            raise ValueError(f"不支持的操作: {action}")
+
 if __name__ == "__main__":
     input_controller = InputController()
     time.sleep(5)
-    input_controller.press_key_once("left")
+    input_controller.tap("left")

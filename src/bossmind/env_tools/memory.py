@@ -9,6 +9,10 @@ logger = logging.getLogger(__name__)
 
 
 class PlayerInfo:
+    """
+    用于管理与游戏进程的连接和内存的读取
+    """
+    
     def __init__(self):
         self.__process_name = None  # 进程名
         self.__module_base = None  # 模块基址
@@ -120,17 +124,17 @@ class PlayerInfo:
         用于获取进程ID
         """
         if self.__pm is None:
-            raise ValueError("进程未连接，请先attach()")
+            self.attach()
         return self.__pm.process_id
 
     def get_player_hp(self):
         """
         用于获取玩家血量
         """
-        # 解析地址链，获取hp地址
         if self.__pm is None:
-            raise ValueError("进程未连接，请先attach()")
+            self.attach()
         try:
+            # 解析地址链，获取hp地址
             if self.__hp_addr is None:
                 self.__hp_addr = self._resolve_pointer_chain(
                     self.__pm,
@@ -148,4 +152,4 @@ class PlayerInfo:
 
 if __name__ == "__main__":
     player_info = PlayerInfo()
-    player_info.attach()
+    player_info.get_pid()
