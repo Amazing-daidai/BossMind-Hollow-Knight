@@ -19,18 +19,21 @@ keybinds:
 menu:
   quit_to_title:
     event:
-      - [esc, 0.1]
+      - [esc, 1.0]
       - [up, 0.0]
-      - [jump, 0.1]
+      - [jump, 1.0]
+      - [up, 0.0]
       - [jump, 5.0]
-  load_save:
+  reload_save:
     event:
-      - [jump, 0.5]
-      - [jump, 5.0]
+      - [up, 0.0]
+      - [down, 0.0]
+      - [jump, 2.0]
+      - [jump, 7.0]
   godhome_boss_room:
     hornet:
       event:
-        - right: [press, 5.0, 0.0]
-        - jump: [hold, 5.0, 1.0]
-        - right: [release, 0.0, 0.0]
+        - jump: [tap, 1.2, 0.0]
+        - right: [hold, 1.4, 0.8]
+        - right: [hold, 0.0, 5.8]
 

@@ -42,17 +42,17 @@ class Menu:
             time.sleep(float(delay))
         logger.info("退出到主菜单操作完成")
 
-    # 加载存档
-    def load_save(self):
+
+    # 重新加载存档
+    def reload_save(self):
         """
-        加载存档
+        重新加载存档
         """
-        logger.info("开始加载存档操作")
-        event_list = self.__menu_config["load_save"]["event"]
+        logger.info("开始重新加载存档操作")
+        event_list = self.__menu_config["reload_save"]["event"]
         for key, delay in event_list:
             self._input.tap(key)
             time.sleep(float(delay))
-        logger.info("加载存档操作完成")
 
     # 前往指定boss房前
     def goto_boss_room(self, boss_name: str):
@@ -74,10 +74,11 @@ class Menu:
         重置游戏
         """
         self.quit_to_title()
-        self.load_save()
+        self.reload_save()
 
 if __name__ == "__main__":
     input_controller = InputController()
     menu = Menu(input_controller)
+    time.sleep(5)
     menu.goto_boss_room("hornet")
 

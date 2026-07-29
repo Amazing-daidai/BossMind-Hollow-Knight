@@ -46,10 +46,10 @@
 
 | 字段 | 值 |
 |------|-----|
-| 阶段 | **Phase 0 — 真环境探针** |
-| 子课 | **第 4 课 B 机验收（今晚）** |
-| 完成 | L1–L3 B✅；**L4 A 代码就绪**（审阅通过） |
-| 阻塞 | 菜单 delay / 神居寻路事件需 B 机对着实机调；`Mod` 仍为占位 |
+| 阶段 | **Phase 0 收官** → 下轮 **Phase 1** |
+| 子课 | L4 B 验收完成 |
+| 完成 | L1–L4 **B 机全部验收通过** |
+| 阻塞 | 无；Phase 1 前可后置 WSL/ROCm |
 | 更新 | 2026-07-29 |
 
 **Phase 0 清单**
@@ -57,59 +57,28 @@
 - [x] L1 `probe_attach`（B）
 - [x] L2 `probe_hp`（B）
 - [x] L3 `probe_input`（B）
-- [x] L4 A：`session.py` + `reset_backends/menu.py` + `probe_loop.py` + yaml `menu`
-- [ ] L4 B：`probe_loop` ×10 + `results/phase0.md` ← **当前**
+- [x] L4 B：`probe_loop` ×10 + `results/phase0.md`（2026-07-29，10/10 HP match）
 - [ ] WSL/ROCm（Phase 1 前，可后置）
 
 ---
 
-## 3. 下一步（设备 B · 今晚）
+## 3. 下一步（Phase 1 准备）
 
-### 前置
+Phase 0 **已收官**（见 `results/phase0.md`）。
 
-```text
-git pull
-cd /d E:\BossMind
-conda activate BossMind
-pip install -e .
-```
+| 优先级 | 任务 |
+|--------|------|
+| 1 | B 机：`git pull` / `commit` + `push` 本轮回档 |
+| 2 | Phase 1：DebugMod + `ModResetBackend`；专家轨迹采集协议 |
+| 3 | B 机：WSL2 + ROCm 冒烟（训练前） |
 
-- 游戏：**窗口化 / 无边框**；关自动更新  
-- 存档：能「继续」进到与 yaml 寻路匹配的起点（当前配置名 `godhome_boss_room.hornet`）  
-- 键位与 `game_info.yaml` → `keybinds` 一致（确认键目前用 `jump`=space）
-
-### 跑验收
+### Phase 0 验收摘要（勿删）
 
 ```text
-python scripts\probe_loop.py
-# 5 秒内点到游戏窗口
-# 期望：×10 菜单读档 + goto；每次 HP 与基线一致；无 traceback
+python scripts\probe_loop.py  →  10/10 HP match（2026-07-29，B 机）
 ```
 
-流程（代码已实现）：
-
-```text
-load_save → attach → goto(hornet) → 记 baseline HP
-×10: reset(menu) → attach → goto → 对比 HP
-finally: detach
-```
-
-### 调参（卡了再改 yaml，少改代码）
-
-| 现象 | 改哪里 |
-|------|--------|
-| 退不出游戏 / 选错菜单 | `menu.quit_to_title.event` 的键与 delay |
-| 标题「继续」失败 | `menu.load_save.event` |
-| 走到错误位置 | `menu.godhome_boss_room.hornet.event` |
-| 读档后 HP 失败 | 确认 `attach` 在 reset 后执行（脚本已有）；偏移见 L2 |
-
-### 验收通过后
-
-1. 写 `results/phase0.md`（日期、窗口模式、平均耗时、10 次是否全 match）  
-2. 更新本文件 §2（L4 B✅）+ §5 里程碑  
-3. `commit` + `push` → Phase 0 收官，下轮 Phase 1  
-
-### Phase 1 备忘（现在不写）
+### Phase 1 备忘
 
 - DebugMod → `Mod.reset_game`；采集用 mod，评估强制 menu  
 - 训练：Windows 采集 → WSL `~/bossmind-train/` ext4（勿每 epoch 扫 `/mnt/e`）
@@ -127,7 +96,7 @@ src/bossmind/env_tools/
   memory.py  input.py  session.py           # ✅
   reset_backends/menu.py                    # ✅ 菜单读档
   reset_backends/mod.py                     # ☐ 空壳，Phase 1
-results/phase0.md                           # ☐ B 验收后写
+results/phase0.md                           # ✅ B 验收报告
 ```
 
 安装：`pip install -e .` · 配置经 `paths.GAME_INFO_FILE`
@@ -148,7 +117,8 @@ results/phase0.md                           # ☐ B 验收后写
 
 | 日期 | 事件 |
 |------|------|
-| 2026-07-29 | **L4 A 就绪**：session + Menu 读档 + probe_loop；待 B 验收 |
+| 2026-07-29 | **Phase 0 收官**：L4 B 验收 `probe_loop` 10/10 HP match；`results/phase0.md` |
+| 2026-07-29 | L4 A 就绪：session + Menu 读档 + probe_loop |
 | 2026-07-28 | 进度同步：L1–L3 B 验收完成 |
 | 2026-07-27 | L3 B 验收；AGENTS.md 精简；双轨重置架构定稿 |
 | 2026-07-23 | L2 B 验收 |
