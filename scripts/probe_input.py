@@ -17,7 +17,7 @@ def main():
     input_controller.press_key("left")
     time.sleep(3)
     input_controller.hold_key("jump", 0.3)
-    input_controller.press_key_once("attack")
+    input_controller.tap("attack")
     time.sleep(3)
     input_controller.release_key("left")
     print("动作序列执行完毕")

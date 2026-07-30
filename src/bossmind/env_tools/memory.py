@@ -14,13 +14,13 @@ class PlayerInfo:
     """
     
     def __init__(self):
-        self.__process_name = None  # 进程名
-        self.__module_base = None  # 模块基址
-        self.__base_offset = None  # 基址偏移
-        self.__offsets = None  # 偏移链
-        self.__hp_offset = None  # 血量偏移
-        self.__pm = None  # pymem对象
-        self.__hp_addr = None  # 血量地址
+        self._process_name = None  # 进程名
+        self._module_base = None  # 模块基址
+        self._base_offset = None  # 基址偏移
+        self._offsets = None  # 偏移链
+        self._hp_offset = None  # 血量偏移
+        self._pm = None  # pymem对象
+        self._hp_addr = None  # 血量地址
         self._get_config()
 
     # 工具函数
@@ -35,12 +35,12 @@ class PlayerInfo:
         # 读取配置文件，获取基址与血量偏移
         with open(GAME_INFO_FILE, "r", encoding="utf-8") as f:
             config = yaml.safe_load(f)
-            self.__process_name = config["process_name"]
+            self._process_name = config["process_name"]
             player_info = config["player_info"]
-            self.__module_base = player_info["module_base"]
-            self.__base_offset = player_info["base_offset"]
-            self.__offsets = player_info["offsets"]
-            self.__hp_offset = player_info["hp_offset"]
+            self._module_base = player_info["module_base"]
+            self._base_offset = player_info["base_offset"]
+            self._offsets = player_info["offsets"]
+            self._hp_offset = player_info["hp_offset"]
 
     # 进程处理
     def _get_pm(self):
@@ -48,24 +48,24 @@ class PlayerInfo:
         用于获取pm对象
         """
         try:
-            self.__pm = pymem.Pymem(self.__process_name)
+            self._pm = pymem.Pymem(self._process_name)
         except pymem.exception.ProcessNotFound:
-            raise ValueError(f"未找到进程: {self.__process_name}")
+            raise ValueError(f"未找到进程: {self._process_name}")
         except pymem.exception.CouldNotOpenProcess:
-            raise ValueError(f"打开进程失败: {self.__process_name}")
+            raise ValueError(f"打开进程失败: {self._process_name}")
 
     def _clean_addr(self):
         """
         清除缓存地址
         """
-        self.__hp_addr = None
+        self._hp_addr = None
 
     def _close_pm(self):
         """
         关闭pm对象
         """
         try:
-            self.__pm.close_process()
+            self._pm.close_process()
         except Exception as e:
             raise ValueError(f"关闭进程失败: {e}")
 
@@ -99,7 +99,7 @@ class PlayerInfo:
         """
         用于获取并保持连接到游戏进程
         """
-        if self.__pm is not None:
+        if self._pm is not None:
             logger.debug("进程已连接，无需重新连接")
             return
         try:
@@ -112,9 +112,9 @@ class PlayerInfo:
         断开与游戏进程的连接，清除缓存地址
         """
         self._clean_addr()
-        if self.__pm is not None:
+        if self._pm is not None:
             self._close_pm()
-            self.__pm = None
+            self._pm = None
             logger.debug("进程已关闭，缓存已清除")
         else:
             logger.debug("进程未连接，缓存已清除")
@@ -123,28 +123,28 @@ class PlayerInfo:
         """
         用于获取进程ID
         """
-        if self.__pm is None:
+        if self._pm is None:
             self.attach()
-        return self.__pm.process_id
+        return self._pm.process_id
 
     def get_player_hp(self):
         """
         用于获取玩家血量
         """
-        if self.__pm is None:
+        if self._pm is None:
             self.attach()
         try:
             # 解析地址链，获取hp地址
-            if self.__hp_addr is None:
-                self.__hp_addr = self._resolve_pointer_chain(
-                    self.__pm,
-                    self.__module_base,
-                    self.__base_offset,
-                    self.__offsets,
-                    self.__hp_offset,
+            if self._hp_addr is None:
+                self._hp_addr = self._resolve_pointer_chain(
+                    self._pm,
+                    self._module_base,
+                    self._base_offset,
+                    self._offsets,
+                    self._hp_offset,
                 )
             # 读取血量
-            hp = self.__pm.read_int(self.__hp_addr)
+            hp = self._pm.read_int(self._hp_addr)
             return hp
         except Exception as e:
             raise ValueError(f"获取玩家血量失败: {e}")

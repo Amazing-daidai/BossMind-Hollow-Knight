@@ -5,6 +5,8 @@ player_info:
   offsets: [0x0, 0x0, 0x10, 0x18, 0x0, 0x60]
   hp_offset: 0x198
   hp_value_type: 当前仅int32，无需调整。
+boss_info:
+  hornet:
 keybinds:
   left: a
   right: d
@@ -13,6 +15,8 @@ keybinds:
   jump: space
   attack: j
   dash: lshift
+  super_dash: h
+  dream_knife: f
   heal: l
   skill: k
   esc: esc
@@ -36,4 +40,9 @@ menu:
         - jump: [tap, 1.2, 0.0]
         - right: [hold, 1.4, 0.8]
         - right: [hold, 0.0, 5.8]
+collect:
+  sample_hz: 50
+  countdown_s: 5
+  boss: hornet
+
 

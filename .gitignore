@@ -213,3 +213,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# BossMind runtime data (trajectories, checkpoints — keep on device B / sync separately)
+data/raw/
+data/processed/
+artifacts/
+!tests/fixtures/

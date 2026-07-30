@@ -53,12 +53,6 @@ class GameSession:
             time.sleep(5)
         else:
             raise ValueError("无效的重置方法")
-
-    def load_save(self):
-        """
-        加载存档
-        """
-        self._menu.load_save()
     
     def goto_boss_room(self, boss_name: str):
         """

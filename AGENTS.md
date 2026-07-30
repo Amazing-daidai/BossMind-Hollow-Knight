@@ -5,16 +5,8 @@
 
 ### 文档说明（2026-07-27 精简）
 
-本文档由 **~555 行 → ~100 行** 主动压缩，**未改项目约定**，只为省 Agent 上下文。
-
-| 仍在这里 | 已移出（双方已确认，不必每次重读） |
-|----------|-----------------------------------|
-| §2 状态、§3 当前任务 | WSL/ROCm 逐步安装教程 |
-| 双设备分工与路径 | CNN/数据对齐/八步训练流水线（Phase 2+ 再单开 doc） |
-| 神居 + 双轨重置架构 | 已完成环境清单（conda、CE、probe_attach 等） |
-| 仓库结构、里程碑 | 协作约定长表、阶段地图、ASCII 架构图 |
-
-**找旧内容**：`git log -p -- AGENTS.md` 看精简前版本；Phase 1 环境细节以后可写 `docs/env-b.md`，需要时再引用。
+本文档由 **~555 行 → ~100 行** 主动压缩，**未改项目约定**，只为省 Agent 上下文。  
+**找旧内容**：`git log -p -- AGENTS.md`；WSL 细节需要时再写 `docs/env-b.md`。
 
 ---
 
@@ -23,22 +15,32 @@
 | 项 | 内容 |
 |----|------|
 | 目标 | 神居 Pantheon 单 Boss **速通/无伤**；BC + LLM Option + 局外训练师（弱融合） |
-| 评估场景 | Hall of Gods；MVP：**Pantheon 1 + Attuned** |
-| 重置 | **评估/演示** = 菜单读档（无 mod）；**训练采数** = DebugMod SL（Phase 1） |
-| 不做 | 大地图 Boss 主线、LLM 每帧按键、战斗内热更新权重 |
-| 协作 | 用户自写代码；Agent 师父模式（思路/审代码/排错，不代写整模块） |
+| 评估场景 | Hall of Gods；MVP：`godhome_boss_room.hornet` / Pantheon Attuned |
+| 重置 | **评估/演示** = 菜单读档；**训练采数** = DebugMod SL（Phase 1 中段） |
+| 不做（Phase 1） | CNN 主输入、LLM、在线 RL、评估用 mod |
+
+### 协作铁律（Agent 必读 — 2026-07-30 重申）
+
+| 规则 | 说明 |
+|------|------|
+| **师父模式** | 用户**自行实现**代码；Agent 只做：讲思路、给步骤、审代码、排错、定接口/验收 |
+| **禁止代写** | **不要**主动写整模块/整脚本完工代码；Cursor Plan「Implement」**不能**覆盖本条 |
+| **唯一例外** | 用户用明确措辞要求代写，例如：「请代写 xxx」「帮我把这个文件写完」 |
+| **文档同步** | 可改 `AGENTS.md` / 进度；改业务代码须先征得同意或属于上述例外 |
+| **讲解方式** | **自上而下**：新模块先讲概况/职责/接口；用户某块不懂再 **自下而上** 拆代码 |
+| **推进节奏** | 用户先写 → 交 Agent 审 → 通过再进下一步；不跳步代写 |
+
+> 失误记录（2026-07-30）：Plan 点了 Implement 后 Agent 代写了 Phase 1 采集骨架；已撤回。之后一律按师父模式。
 
 **双设备**
 
 | | A | B（7900 XT · 必须 Windows） |
 |--|---|-------------------------------|
 | 路径 | `D:\BossMind` | `E:\BossMind` |
-| Python | `…/conda/envs/BossMind/python.exe` **3.12.13** | 同左 |
+| Python | conda `BossMind` **3.12.13** | 同左 |
 | 写代码 | ✅ | ✅ |
-| 跑 HK / 内存 / 按键 / 采集 / 评估 | ❌ | ✅ |
-| GPU 训练 | ❌ | WSL2 + ROCm（Phase 1 再装） |
-
-游戏相关验收**只在 B**。`data/`、`artifacts/` 留 B；大文件不进 Git。
+| HK / 采数 / 评估 | ❌ | ✅ |
+| GPU 训练 | ❌ | WSL2 + ROCm（待装） |
 
 ---
 
@@ -46,70 +48,58 @@
 
 | 字段 | 值 |
 |------|-----|
-| 阶段 | **Phase 0 收官** → 下轮 **Phase 1** |
-| 子课 | L4 B 验收完成 |
-| 完成 | L1–L4 **B 机全部验收通过** |
-| 阻塞 | 无；Phase 1 前可后置 WSL/ROCm |
-| 更新 | 2026-07-29 |
+| 阶段 | **Phase 1 — 专家 BC**（刚启动，讨论/定协议中） |
+| 子课 | **1.1 采集协议**（尚未写代码） |
+| 完成 | **Phase 0 全部 B 验收通过** |
+| 阻塞 | 无；先对齐采集 schema / 动作来源 / 第一刀顺序 |
+| 更新 | 2026-07-30 |
 
-**Phase 0 清单**
+**Phase 0 清单（已关闭）**
 
-- [x] L1 `probe_attach`（B）
-- [x] L2 `probe_hp`（B）
-- [x] L3 `probe_input`（B）
-- [x] L4 B：`probe_loop` ×10 + `results/phase0.md`（2026-07-29，10/10 HP match）
-- [ ] WSL/ROCm（Phase 1 前，可后置）
+- [x] L1–L4 B 验收；`probe_loop` **10/10 HP match**（2026-07-29）
+- [x] `results/phase0.md`
+
+**Phase 1 清单**
+
+- [ ] 1.1 采集 schema + `collect_expert`（用户实现；Agent 指导）
+- [ ] B 试采 2–3 局
+- [ ] DebugMod + `Mod.reset_game`
+- [ ] WSL/ROCm + 纯内存 BC + menu 轨 `eval_bc`
 
 ---
 
-## 3. 下一步（Phase 1 准备）
+## 3. 下一步
 
-Phase 0 **已收官**（见 `results/phase0.md`）。
-
-| 优先级 | 任务 |
-|--------|------|
-| 1 | B 机：`git pull` / `commit` + `push` 本轮回档 |
-| 2 | Phase 1：DebugMod + `ModResetBackend`；专家轨迹采集协议 |
-| 3 | B 机：WSL2 + ROCm 冒烟（训练前） |
-
-### Phase 0 验收摘要（勿删）
+### Phase 0 收官摘要
 
 ```text
-python scripts\probe_loop.py  →  10/10 HP match（2026-07-29，B 机）
+python scripts\probe_loop.py  →  10/10 HP match（B，2026-07-29）
+底座：session + Menu 菜单读档 + InputController + PlayerInfo(HP)
 ```
 
-### Phase 1 备忘
+### Phase 1 目标（讨论用）
 
-- DebugMod → `Mod.reset_game`；采集用 mod，评估强制 menu  
-- 训练：Windows 采集 → WSL `~/bossmind-train/` ext4（勿每 epoch 扫 `/mnt/e`）
+手打专家轨迹 → 纯内存 BC → **菜单轨**固定评估；Mod 只加速采数。
+
+**建议默认（待用户确认后再开写）：**
+
+1. 动作标签 = **键盘钩子**读真实按键（非只记脚本注入）  
+2. 第一刀 = schema + 菜单 reset 采集；Mod / WSL 不挡开工  
+
+**本轮 Agent 应做**：对齐字段与脚本职责 → 给实现步骤 → 等用户交代码再审。  
+**本轮 Agent 不应做**：代写 `collect_expert` / dataset / train。
 
 ---
 
-## 4. 仓库（L4 现状）
+## 4. 仓库（Phase 0 末状态）
 
 ```text
 configs/game_info.yaml
-  # process_name, player_info, keybinds
-  # menu.quit_to_title / load_save / godhome_boss_room.hornet
-scripts/probe_{attach,hp,input,loop}.py     # ✅
-src/bossmind/env_tools/
-  memory.py  input.py  session.py           # ✅
-  reset_backends/menu.py                    # ✅ 菜单读档
-  reset_backends/mod.py                     # ☐ 空壳，Phase 1
-results/phase0.md                           # ✅ B 验收报告
+scripts/probe_{attach,hp,input,loop}.py
+src/bossmind/env_tools/{memory,input,session}.py
+src/bossmind/env_tools/reset_backends/{menu,mod}.py   # mod 仍空壳
+results/phase0.md
 ```
-
-安装：`pip install -e .` · 配置经 `paths.GAME_INFO_FILE`
-
-**API 摘要**
-
-| 类/脚本 | 作用 |
-|---------|------|
-| `PlayerInfo` | attach / 读 HP / detach |
-| `InputController` | tap / press / hold / `run_action` |
-| `Menu` | `quit_to_title` / `load_save` / `goto_boss_room` / `reset_game` |
-| `GameSession` | 组装上三者；`reset_game("menu"|"mod")` |
-| `probe_loop.py` | ×10 验收入口 |
 
 ---
 
@@ -117,9 +107,9 @@ results/phase0.md                           # ✅ B 验收报告
 
 | 日期 | 事件 |
 |------|------|
-| 2026-07-29 | **Phase 0 收官**：L4 B 验收 `probe_loop` 10/10 HP match；`results/phase0.md` |
-| 2026-07-29 | L4 A 就绪：session + Menu 读档 + probe_loop |
-| 2026-07-28 | 进度同步：L1–L3 B 验收完成 |
-| 2026-07-27 | L3 B 验收；AGENTS.md 精简；双轨重置架构定稿 |
-| 2026-07-23 | L2 B 验收 |
-| 2026-07-21 | L1 B 验收；B 环境就绪 |
+| 2026-07-30 | **协作铁律重申**：师父模式优先于 Plan Implement；Phase 1 启动讨论（代写已撤回） |
+| 2026-07-29 | **Phase 0 收官**：L4 B 10/10；`results/phase0.md` |
+| 2026-07-28 | L1–L3 B 验收完成 |
+| 2026-07-27 | L3 B；AGENTS 精简；双轨重置定稿 |
+| 2026-07-23 | L2 B |
+| 2026-07-21 | L1 B |

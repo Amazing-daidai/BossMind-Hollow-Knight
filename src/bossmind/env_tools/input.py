@@ -14,7 +14,7 @@ class InputController:
     """
     def __init__(self):
         self._keybinds = None  # 按键字典
-        pydirectinput.PAUSE = 0.03
+        pydirectinput.PAUSE = 0.02
         self._get_config()
 
     # 工具函数
