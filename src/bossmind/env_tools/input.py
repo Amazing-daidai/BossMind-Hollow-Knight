@@ -1,9 +1,8 @@
 import time
 import logging
-import yaml
 import pydirectinput
 
-from bossmind.paths import GAME_INFO_FILE
+from bossmind.config import load_config
 
 # 日志
 logger = logging.getLogger(__name__)
@@ -12,7 +11,8 @@ class InputController:
     """
     用于按键输入
     """
-    def __init__(self):
+    def __init__(self, config):
+        self._config = config
         self._keybinds = None  # 按键字典
         pydirectinput.PAUSE = 0.02
         self._get_config()
@@ -23,13 +23,7 @@ class InputController:
         """
         用于加载配置文件，获取按键配置
         """
-        # 校验配置文件是否存在
-        if not GAME_INFO_FILE.exists():
-            raise FileNotFoundError(f"配置文件不存在: {GAME_INFO_FILE}")
-        # 读取配置文件，获取按键
-        with open(GAME_INFO_FILE, "r", encoding="utf-8") as f:
-            config = yaml.safe_load(f)
-            self._keybinds = config["keybinds"]
+        self._keybinds = self._config.keybinds
 
     # 获取实际按键
     def _get_actual_key(self, name: str) -> str:
@@ -98,6 +92,7 @@ class InputController:
             raise ValueError(f"不支持的操作: {action}")
 
 if __name__ == "__main__":
-    input_controller = InputController()
+    config = load_config()
+    input_controller = InputController(config)
     time.sleep(5)
     input_controller.tap("left")

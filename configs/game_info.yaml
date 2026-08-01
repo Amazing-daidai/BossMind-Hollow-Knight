@@ -4,9 +4,11 @@ player_info:
   base_offset: 0x01F28838
   offsets: [0x0, 0x0, 0x10, 0x18, 0x0, 0x60]
   hp_offset: 0x198
+  max_hp_offset: 0x19C
+  max_hp: 9 # 神居档的最大血量为9，目前本项目只考虑神居。提前设置好最大血量，用于检验通过内存读取到的最大血量是否正确
   hp_value_type: 当前仅int32，无需调整。
 boss_info:
-  hornet:
+  GG_Hornet_1:
 keybinds:
   left: a
   right: d
@@ -23,26 +25,28 @@ keybinds:
 menu:
   quit_to_title:
     event:
-      - [esc, 1.0]
-      - [up, 0.0]
-      - [jump, 1.0]
-      - [up, 0.0]
-      - [jump, 5.0]
+      - {key: esc, action: tap, duration: 0.0, delay: 0.0}
+      - {key: up, action: tap, duration: 0.0, delay: 0.0}
+      - {key: jump, action: tap, duration: 0.0, delay: 1.0}
+      - {key: up, action: tap, duration: 0.0, delay: 0.0}
+      - {key: jump, action: tap, duration: 0.0, delay: 5.0}
   reload_save:
     event:
-      - [up, 0.0]
-      - [down, 0.0]
-      - [jump, 2.0]
-      - [jump, 7.0]
+      - {key: up, action: tap, duration: 0.0, delay: 0.0}
+      - {key: down, action: tap, duration: 0.0, delay: 0.0}
+      - {key: jump, action: tap, duration: 0.0, delay: 2.0}
+      - {key: jump, action: tap, duration: 0.0, delay: 7.0}
   godhome_boss_room:
-    hornet:
+    GG_Hornet_1:
       event:
-        - jump: [tap, 1.2, 0.0]
-        - right: [hold, 1.4, 0.8]
-        - right: [hold, 0.0, 5.8]
+        - {key: jump, action: tap, duration: 0.0, delay: 1.2}
+        - {key: right, action: hold, duration: 0.8, delay: 1.4}
+        - {key: right, action: hold, duration: 5.8, delay: 0.0}
 collect:
-  sample_hz: 50
+  sample_hz: 60
   countdown_s: 5
-  boss: hornet
-
-
+  boss: GG_Hornet_1
+  max_episode_s: 300          # 单局最长秒数 → end_reason=timeout
+  max_hp_read_fail: 30        # 连续 hp 读失败帧数上限 → discard
+  max_focus_lost: 120         # 连续失焦帧数上限 → discard
+  max_dropped: 100            # 追帧累计丢帧上限 → discard

@@ -1,16 +1,17 @@
 import time
 import pynput
 import logging
-import yaml
 import threading
 
-from bossmind.paths import GAME_INFO_FILE
+from bossmind.config import load_config
+from bossmind.data.schema import ButtonStates, KeyStates
 
 logger = logging.getLogger(__name__)
 
 
 class KeyboardHook:
-    def __init__(self):
+    def __init__(self, config):
+        self._config = config
         self._key_dict = None  # 按键字典
         self._logic_key_dict = None  # 逻辑键字典
         self._get_config()
@@ -27,9 +28,23 @@ class KeyboardHook:
             "heal": False,
             "skill": False,
         }
+        self._edge = {
+            "left": False,
+            "right": False,
+            "up": False,
+            "down": False,
+            "jump": False,
+            "attack": False,
+            "dash": False,
+            "super_dash": False,
+            "dream_knife": False,
+            "heal": False,
+            "skill": False,
+        }
         self._listener = None
         self._lock = threading.Lock()
         self.is_running = False
+        self.is_ok = False
 
     # 工具函数
     # 配置
@@ -37,14 +52,8 @@ class KeyboardHook:
         """
         用于加载配置文件，获取按键配置
         """
-        # 校验配置文件是否存在
-        if not GAME_INFO_FILE.exists():
-            raise FileNotFoundError(f"配置文件不存在: {GAME_INFO_FILE}")
-        # 读取配置文件，获取按键
-        with open(GAME_INFO_FILE, "r", encoding="utf-8") as f:
-            config = yaml.safe_load(f)
-            self._key_dict = config["keybinds"]
-            self._logic_key_dict = {v: k for k, v in self._key_dict.items()}
+        self._key_dict = self._config.keybinds
+        self._logic_key_dict = {v: k for k, v in self._key_dict.items()}
 
     # 监听键转token
     def _key_to_token(self, key):
@@ -71,6 +80,10 @@ class KeyboardHook:
         if key == pynput.keyboard.Key.f12:
             self.stop()
             return False
+        # 用于collect准备
+        if key == pynput.keyboard.Key.f11:
+            self.is_ok = True
+            return
         # 获取按键token
         token = self._key_to_token(key)
         # 如果按键token为空, 则返回
@@ -83,7 +96,9 @@ class KeyboardHook:
             return
         # 更新状态
         with self._lock:
-            self._state[logic_key] = True
+            if not self._state[logic_key]:      # 刚才是松开的
+                self._edge[logic_key] = True    # 记一次「按下」
+            self._state[logic_key] = True       # 再更新 held
 
     # 按键释放
     def _on_release(self, key):
@@ -117,24 +132,34 @@ class KeyboardHook:
         """
         停止键盘监听, 重置状态
         """
-        if self.is_running:
-            self._listener.stop()
+        try:
+            if self.is_running:
+                self._listener.stop()
+        finally:
             with self._lock:
                 for k in self._state:
                     self._state[k] = False
+                for k in self._edge:
+                    self._edge[k] = False
             self._listener = None
             self.is_running = False
+            self.is_ok = False
     
     def snapshot(self):
         """
         获取当前状态快照
         """
         with self._lock:
-            return dict(self._state)
+            held = ButtonStates(**dict(self._state))
+            pressed = ButtonStates(**dict(self._edge))
+            for k in self._edge:
+                self._edge[k] = False
+            return KeyStates(held=held, pressed=pressed)
 
 
 if __name__ == "__main__":
-    keyboard_hook = KeyboardHook()
+    config = load_config()
+    keyboard_hook = KeyboardHook(config)
     keyboard_hook.start()
     try:
         while keyboard_hook.is_running:

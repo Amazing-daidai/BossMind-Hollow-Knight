@@ -2,6 +2,7 @@ import logging
 import time
 
 from bossmind.env_tools.input import InputController
+from bossmind.config import load_config
 
 logging.basicConfig(level=logging.WARNING)
 
@@ -12,7 +13,8 @@ def main():
     for i in range(3, 0, -1):
         print(f"{i}...")
         time.sleep(1)
-    input_controller = InputController()
+    config = load_config()
+    input_controller = InputController(config)
     input_controller.hold_key("right", 3.0)
     input_controller.press_key("left")
     time.sleep(3)

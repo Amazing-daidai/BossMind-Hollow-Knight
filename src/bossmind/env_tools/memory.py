@@ -1,9 +1,9 @@
 import logging
 
 import pymem
-import yaml
 
-from bossmind.paths import GAME_INFO_FILE
+from bossmind.config import load_config
+from bossmind.data.schema import PlayerStates
 
 logger = logging.getLogger(__name__)
 
@@ -13,15 +13,21 @@ class PlayerInfo:
     用于管理与游戏进程的连接和内存的读取
     """
     
-    def __init__(self):
+    def __init__(self, config):
         self._process_name = None  # 进程名
         self._module_base = None  # 模块基址
         self._base_offset = None  # 基址偏移
         self._offsets = None  # 偏移链
         self._hp_offset = None  # 血量偏移
+        self._soul_offset = None  # 灵魂偏移
+        self._max_hp_offset = None  # 最大血量偏移
         self._pm = None  # pymem对象
         self._hp_addr = None  # 血量地址
+        self._soul_addr = None  # 灵魂地址
+        self._max_hp_addr = None  # 最大血量地址
+        self._config = config
         self._get_config()
+
 
     # 工具函数
     # 配置
@@ -29,18 +35,12 @@ class PlayerInfo:
         """
         用于加载配置文件，获取地址信息，并赋值给私有属性
         """
-        # 校验配置文件是否存在
-        if not GAME_INFO_FILE.exists():
-            raise FileNotFoundError(f"配置文件不存在: {GAME_INFO_FILE}")
-        # 读取配置文件，获取基址与血量偏移
-        with open(GAME_INFO_FILE, "r", encoding="utf-8") as f:
-            config = yaml.safe_load(f)
-            self._process_name = config["process_name"]
-            player_info = config["player_info"]
-            self._module_base = player_info["module_base"]
-            self._base_offset = player_info["base_offset"]
-            self._offsets = player_info["offsets"]
-            self._hp_offset = player_info["hp_offset"]
+        self._process_name = self._config.process_name
+        self._module_base = self._config.player_info["module_base"]
+        self._base_offset = self._config.player_info["base_offset"]
+        self._offsets = self._config.player_info["offsets"]
+        self._hp_offset = self._config.player_info["hp_offset"]
+        self._max_hp_offset = self._config.player_info["max_hp_offset"]
 
     # 进程处理
     def _get_pm(self):
@@ -59,6 +59,8 @@ class PlayerInfo:
         清除缓存地址
         """
         self._hp_addr = None
+        self._soul_addr = None
+        self._max_hp_addr = None
 
     def _close_pm(self):
         """
@@ -127,29 +129,118 @@ class PlayerInfo:
             self.attach()
         return self._pm.process_id
 
-    def get_player_hp(self):
+    # 通用读取数据函数
+    def _get_data_once(self, addr_name: str, final_offset: int):
+        """
+        可用于hp，soul，max_hp的读取
+        """
+        try:
+            # 解析地址链，获取hp地址
+            if getattr(self, addr_name) is None:
+                setattr(self, addr_name, self._resolve_pointer_chain(
+                    self._pm,
+                    self._module_base,
+                    self._base_offset,
+                    self._offsets,
+                    final_offset,
+                ))
+            result = self._pm.read_int(getattr(self, addr_name))
+            return result
+        except Exception as e:
+            logger.debug(f"读取数据失败: {e}")
+            return None
+
+    def _get_player_hp(self, max_hp:int):
         """
         用于获取玩家血量
         """
         if self._pm is None:
             self.attach()
         try:
-            # 解析地址链，获取hp地址
-            if self._hp_addr is None:
-                self._hp_addr = self._resolve_pointer_chain(
-                    self._pm,
-                    self._module_base,
-                    self._base_offset,
-                    self._offsets,
-                    self._hp_offset,
-                )
             # 读取血量
-            hp = self._pm.read_int(self._hp_addr)
-            return hp
+            hp = self._get_data_once("_hp_addr", self._hp_offset)
+            if hp is None:
+                # 清理地址，重试一次
+                self._clean_addr()
+                hp = self._get_data_once("_hp_addr", self._hp_offset)
+            if 0 <= hp <= max_hp:
+                return hp
+            else:
+                self._clean_addr()
+                return None
         except Exception as e:
-            raise ValueError(f"获取玩家血量失败: {e}")
+            self._clean_addr()
+            logger.warning(f"读取数据失败: {e}")
+            return None
+
+    def _get_player_max_hp(self):
+        """
+        获取玩家最大血量
+        """
+        if self._pm is None:
+            self.attach()
+        try:
+            # 读取最大血量
+            max_hp = self._get_data_once("_max_hp_addr", self._max_hp_offset)
+            if max_hp is None:
+                # 清理地址，重试一次
+                self._clean_addr()
+                max_hp = self._get_data_once("_max_hp_addr", self._max_hp_offset)
+            if max_hp == self._config.player_info["max_hp"]:
+                return max_hp
+            else:
+                self._clean_addr()
+                raise ValueError(f"最大血量有误，请检查地址链")
+        except Exception as e:
+            logger.warning(f"读取数据失败: {e}")
+            self._clean_addr()
+            return None
+
+    def _get_player_soul(self):
+        """
+        获取玩家灵魂
+        """
+        if self._pm is None:
+            self.attach()
+        try:
+            # 读取灵魂
+            soul = self._get_data_once("_soul_addr", self._soul_offset)
+            if soul is None:
+                # 清理地址，重试一次
+                self._clean_addr()
+                soul = self._get_data_once("_soul_addr", self._soul_offset)
+            return soul
+        except Exception as e:
+            logger.warning(f"读取数据失败: {e}")
+            self._clean_addr()
+            return None
+
+    def get_player_states(self):
+        """
+        获取玩家状态，先获取hp，max_hp，soul
+        """
+        max_hp = self._get_player_max_hp()
+        if max_hp is None:
+            max_hp_for_check = self._config.player_info["max_hp"]   # 仅作上界
+            # PlayerStates.max_hp 仍可写 None（表示内存没读到）
+        else:
+            max_hp_for_check = max_hp
+        hp = self._get_player_hp(max_hp_for_check)
+        soul = self._get_player_soul()  # 使用hp和max_hp已经校验地址链正确性，灵魂值暂不增加额外校验
+        return PlayerStates(hp=hp, max_hp=max_hp, soul=soul)
+
+
+    def get_is_battle(self):
+        """
+        判读是否在战斗中
+        """
+        if True:
+            return True
+        else:
+            return False
 
 
 if __name__ == "__main__":
-    player_info = PlayerInfo()
+    config = load_config()
+    player_info = PlayerInfo(config)
     player_info.get_pid()
