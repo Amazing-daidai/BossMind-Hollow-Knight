@@ -41,6 +41,7 @@ class PlayerInfo:
         self._offsets = self._config.player_info["offsets"]
         self._hp_offset = self._config.player_info["hp_offset"]
         self._max_hp_offset = self._config.player_info["max_hp_offset"]
+        self._soul_offset = self._config.player_info["soul_offset"]
 
     # 进程处理
     def _get_pm(self):

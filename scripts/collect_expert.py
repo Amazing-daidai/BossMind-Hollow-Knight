@@ -43,6 +43,9 @@ class CollectExpert:
         # 创建写入器
         self._writer = EpisodeWriter(self.batch_id, self.eps_id, self.boss_name)
         self._writer.pre_write()
+        for i in range(3, 0, -1):
+            print(f"{i}...")
+            time.sleep(1)
         print("收集准备完成")
         return True
 
@@ -85,6 +88,7 @@ class CollectExpert:
                     break
                 time.sleep(0.01)
             # 收集信息
+            self._keyboard_hook.snapshot() # 清除积压
             next_ns = start_ns = time.perf_counter_ns()
             started_at_unix_ns = time.time_ns()
             prev_t_abs_ns = None
