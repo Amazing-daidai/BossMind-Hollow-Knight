@@ -1,5 +1,5 @@
 process_name: hollow_knight.exe
-window_title: hollow_knight
+window_title: Hollow Knight
 player_info:
   module_base: UnityPlayer.dll
   base_offset: 0x01F28838
@@ -15,7 +15,6 @@ player_position:
   offsets: [0x48, 0x370, 0x10]
   x_offset: 0x22C
   y_offset: 0x230
-  z_offset: 0x234
 boss_info:
   GG_Hornet_1:
 keybinds:
@@ -60,7 +59,7 @@ collect:
   max_focus_lost: 120         # 连续失焦帧数上限 → discard
   max_dropped: 100            # 追帧累计丢帧上限 → discard
   vision_hz: 10
-  vision_region: {left: 0, top: 0, width: 200, height: 200}
+  vision_region: {left: 190, top: 230, width: 1550, height: 740}
   vision_format: jpg          # jpg | png
   vision_jpeg_quality: 85
   max_image_dropped: 3        # 队列丢帧累计上限 → discard；正式批次可改为 0

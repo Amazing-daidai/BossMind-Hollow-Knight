@@ -17,6 +17,10 @@ class PlayerInfo:
         self._process_name = None  # 进程名
         self._module_base = None  # 模块基址
         self._base_offset = None  # 基址偏移
+        self._position_base_offset = None  # 位置基址偏移
+        self._position_offsets = None  # 位置偏移链
+        self._position_x_offset = None  # x偏移
+        self._position_y_offset = None  # y偏移
         self._offsets = None  # 偏移链
         self._hp_offset = None  # 血量偏移
         self._soul_offset = None  # 灵魂偏移
@@ -25,6 +29,8 @@ class PlayerInfo:
         self._hp_addr = None  # 血量地址
         self._soul_addr = None  # 灵魂地址
         self._max_hp_addr = None  # 最大血量地址
+        self._position_x_addr = None  # x地址
+        self._position_y_addr = None  # y地址
         self._config = config
         self._get_config()
 
@@ -42,6 +48,10 @@ class PlayerInfo:
         self._hp_offset = self._config.player_info["hp_offset"]
         self._max_hp_offset = self._config.player_info["max_hp_offset"]
         self._soul_offset = self._config.player_info["soul_offset"]
+        self._position_base_offset = self._config.player_position["base_offset"]
+        self._position_offsets = self._config.player_position["offsets"]
+        self._position_x_offset = self._config.player_position["x_offset"]
+        self._position_y_offset = self._config.player_position["y_offset"]
 
     # 进程处理
     def _get_pm(self):
@@ -62,6 +72,8 @@ class PlayerInfo:
         self._hp_addr = None
         self._soul_addr = None
         self._max_hp_addr = None
+        self._position_x_addr = None
+        self._position_y_addr = None
 
     def _close_pm(self):
         """
@@ -130,13 +142,13 @@ class PlayerInfo:
             self.attach()
         return self._pm.process_id
 
-    # 通用读取数据函数
-    def _get_data_once(self, addr_name: str, final_offset: int):
+    # 通用读取int数据函数
+    def _get_int_data_once(self, addr_name: str, final_offset: int):
         """
         可用于hp，soul，max_hp的读取
         """
         try:
-            # 解析地址链，获取hp地址
+            # 解析地址链
             if getattr(self, addr_name) is None:
                 setattr(self, addr_name, self._resolve_pointer_chain(
                     self._pm,
@@ -151,6 +163,27 @@ class PlayerInfo:
             logger.debug(f"读取数据失败: {e}")
             return None
 
+    # 通用读取float数据函数
+    def _get_float_data_once(self, addr_name: str, final_offset: int):
+        """
+        可用于x，y的读取
+        """
+        try:
+            # 解析地址链
+            if getattr(self, addr_name) is None:
+                setattr(self, addr_name, self._resolve_pointer_chain(
+                    self._pm,
+                    self._module_base,
+                    self._position_base_offset,
+                    self._position_offsets,
+                    final_offset,
+                ))
+            result = self._pm.read_float(getattr(self, addr_name))
+            return result
+        except Exception as e:
+            logger.debug(f"读取数据失败: {e}")
+            return None
+
     def _get_player_hp(self, max_hp:int):
         """
         用于获取玩家血量
@@ -159,11 +192,11 @@ class PlayerInfo:
             self.attach()
         try:
             # 读取血量
-            hp = self._get_data_once("_hp_addr", self._hp_offset)
+            hp = self._get_int_data_once("_hp_addr", self._hp_offset)
             if hp is None:
                 # 清理地址，重试一次
                 self._clean_addr()
-                hp = self._get_data_once("_hp_addr", self._hp_offset)
+                hp = self._get_int_data_once("_hp_addr", self._hp_offset)
             if 0 <= hp <= max_hp:
                 return hp
             else:
@@ -182,16 +215,16 @@ class PlayerInfo:
             self.attach()
         try:
             # 读取最大血量
-            max_hp = self._get_data_once("_max_hp_addr", self._max_hp_offset)
+            max_hp = self._get_int_data_once("_max_hp_addr", self._max_hp_offset)
             if max_hp is None:
                 # 清理地址，重试一次
                 self._clean_addr()
-                max_hp = self._get_data_once("_max_hp_addr", self._max_hp_offset)
+                max_hp = self._get_int_data_once("_max_hp_addr", self._max_hp_offset)
             if max_hp == self._config.player_info["max_hp"]:
                 return max_hp
             else:
                 self._clean_addr()
-                raise ValueError(f"最大血量有误，请检查地址链")
+                raise ValueError("最大血量有误，请检查地址链")
         except Exception as e:
             logger.warning(f"读取数据失败: {e}")
             self._clean_addr()
@@ -205,12 +238,50 @@ class PlayerInfo:
             self.attach()
         try:
             # 读取灵魂
-            soul = self._get_data_once("_soul_addr", self._soul_offset)
+            soul = self._get_int_data_once("_soul_addr", self._soul_offset)
             if soul is None:
                 # 清理地址，重试一次
                 self._clean_addr()
-                soul = self._get_data_once("_soul_addr", self._soul_offset)
+                soul = self._get_int_data_once("_soul_addr", self._soul_offset)
             return soul
+        except Exception as e:
+            logger.warning(f"读取数据失败: {e}")
+            self._clean_addr()
+            return None
+    
+    def _get_x(self):
+        """
+        获取玩家x坐标
+        """
+        if self._pm is None:
+            self.attach()
+        try:
+            # 读取x
+            x = self._get_float_data_once("_position_x_addr", self._position_x_offset)
+            if x is None:
+                # 清理地址，重试一次
+                self._clean_addr()
+                x = self._get_float_data_once("_position_x_addr", self._position_x_offset)
+            return x
+        except Exception as e:
+            logger.warning(f"读取数据失败: {e}")
+            self._clean_addr()
+            return None
+    
+    def _get_y(self):
+        """
+        获取玩家y坐标
+        """
+        if self._pm is None:
+            self.attach()
+        try:
+            # 读取y
+            y = self._get_float_data_once("_position_y_addr", self._position_y_offset)
+            if y is None:
+                # 清理地址，重试一次
+                self._clean_addr()
+                y = self._get_float_data_once("_position_y_addr", self._position_y_offset)
+            return y
         except Exception as e:
             logger.warning(f"读取数据失败: {e}")
             self._clean_addr()
@@ -218,7 +289,7 @@ class PlayerInfo:
 
     def get_player_states(self):
         """
-        获取玩家状态，先获取hp，max_hp，soul
+        获取玩家状态，先获取hp，max_hp，soul，x，y
         """
         max_hp = self._get_player_max_hp()
         if max_hp is None:
@@ -228,7 +299,9 @@ class PlayerInfo:
             max_hp_for_check = max_hp
         hp = self._get_player_hp(max_hp_for_check)
         soul = self._get_player_soul()  # 使用hp和max_hp已经校验地址链正确性，灵魂值暂不增加额外校验
-        return PlayerStates(hp=hp, max_hp=max_hp, soul=soul)
+        x = self._get_x()
+        y = self._get_y()
+        return PlayerStates(hp=hp, max_hp=max_hp, soul=soul, x=x, y=y)
 
 
     def get_is_battle(self):

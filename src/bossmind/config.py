@@ -10,6 +10,7 @@ class Config(BaseModel):
     process_name: str
     window_title: str
     player_info: dict
+    player_position: dict
     boss_info: dict
     keybinds: dict
     menu: dict
