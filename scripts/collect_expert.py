@@ -1,12 +1,13 @@
 import time
-
 from datetime import datetime
 
-from bossmind.env_tools.session import GameSession
-from bossmind.env_tools.keyboard_hook import KeyboardHook
 from bossmind.config import load_config
 from bossmind.data.writer import EpisodeWriter
-from bossmind.utils import git_sha, config_hash, percentile_ns
+from bossmind.env_tools.keyboard_hook import KeyboardHook
+from bossmind.env_tools.session import GameSession
+from bossmind.env_tools.vision import Vision
+from bossmind.utils import config_hash, git_sha, percentile_ns
+
 
 class CollectExpert:
     def __init__(self, batch_id: str, boss_name: str):
@@ -16,16 +17,16 @@ class CollectExpert:
         self._config = load_config()
         self._session = GameSession(self._config)
         self._keyboard_hook = KeyboardHook(self._config)
+        self._vision = Vision(self._config)
         self._writer = None
         self._recording_state = False
         self._end_reason = "aborted"
-        
+
     def _pre_collect(self):
         """
         收集前的准备，连接进程，准备写入器，打开键盘监听
         """
         print("请确认打开游戏并已经加载存档")
-        # 确认按钮
         print("请按下F11键确认")
         # 开启键盘监听
         self._keyboard_hook.start()
@@ -36,44 +37,67 @@ class CollectExpert:
                 print("键盘监听已停止，终止收集")
                 return False
             time.sleep(0.1)
-        # 连接游戏进程
+        # 连接进程
         self._session.attach()
-        # 先获取一次信息，提前解析地址链(如果未进入boss房，尝试解析boss信息可能会报错，先这样，后面结合bossinfo再改)
+        # 先解析一次地址链
         self._session.get_observation()
+        # 先校验窗口，再开写盘线程，避免 pre_write 后找窗失败泄漏线程
+        self._vision.pre_capture()
         # 创建写入器
-        self._writer = EpisodeWriter(self.batch_id, self.eps_id, self.boss_name)
+        c = self._config.collect
+        self._writer = EpisodeWriter(
+            self.batch_id,
+            self.eps_id,
+            self.boss_name,
+            image_queue_size=30,
+            image_ext=c.get("vision_format", "jpg"),
+            jpeg_quality=int(c.get("vision_jpeg_quality", 85)),
+        )
+        # 写入前准备
         self._writer.pre_write()
         print("收集准备完成")
         return True
 
     def _collect_data(self):
-        """
-        收集信息
-        """
+        # 采集数据主逻辑
+        # 配置
         c = self._config.collect
-        # 收集帧率
+        # 采集间隔
         INTERVAL_NS = 1_000_000_000 // c["sample_hz"]
+        # 采集帧索引
         frame_idx = 0
-        # 防止抖动
+        # 胜利计数
         false_streak = 0
+        # 胜利阈值
         DEBOUNCE = 3
-        # 追帧参数
+        # 最大滞后周期
         MAX_LAG_PERIODS = 2
+        # 丢弃帧数
         n_dropped = 0
+        # 最大丢弃帧数
         MAX_DROPPED = c["max_dropped"]
-        # 失焦上限
+        # 最大失焦帧数
         MAX_FOCUS_LOST = c["max_focus_lost"]
+        # 失焦数
         n_loss = 0
-        # 读取异常
+        # 最大HP读取失败次数
         MAX_HP_READ_FAIL = c["max_hp_read_fail"]
-        # 最长时间
+        # 最大持续时间
         MAX_DURATION_NS = int(c["max_episode_s"] * 1e9)
-        # finally 可能在等战斗阶段就执行，先初始化
+        # 图像采集间隔
+        VISION_INTERVAL_NS = int(1e9 / c["vision_hz"])
+        # 初始采集时间
+        last_vision_ns = -VISION_INTERVAL_NS
+        # 最大图像丢弃帧数
+        MAX_IMAGE_DROPPED = int(c.get("max_image_dropped", 3))
+        # 开始时间
         started_at_unix_ns = time.time_ns()
+        # 时间差列表
         dt_list: list[int] = []
-
+        # 图像采集时间差列表
+        cap_list: list[int] = []
         try:
-            # 判断是否进入战斗
+            # 等待战斗开始
             while True:
                 if self._session.get_is_battle():
                     self._recording_state = True
@@ -84,35 +108,44 @@ class CollectExpert:
                     self._recording_state = False
                     break
                 time.sleep(0.01)
-            # 收集信息
+            # 下一采集时间
             next_ns = start_ns = time.perf_counter_ns()
+            # 开始时间
             started_at_unix_ns = time.time_ns()
+            # 上次采集时间
             prev_t_abs_ns = None
+            # 数据采集循环
             while self._recording_state:
-                # 记录当前时间
+                # 当前时间
                 now = time.perf_counter_ns()
-                # 检查是否严重落后
+                # 判断是否严重滞后
                 if now > next_ns + MAX_LAG_PERIODS * INTERVAL_NS:
+                    # 滞后时间
                     behind = now - next_ns
+                    # 跳过帧数
                     skipped = behind // INTERVAL_NS
+                    # 丢弃帧数
                     n_dropped += skipped
+                    # 跳过滞后
                     next_ns = now
                     print(f"严重落后，跳过{skipped}帧")
-                # 核心记拍器
+                # 等到下一采集时间
                 if now < next_ns:
                     time.sleep((next_ns - now) / 1e9)
-                # 采集数据
+                # 当前时间
                 t_abs_ns = time.perf_counter_ns()
-                # 计算两帧实际间隔
+                # 记录当次采集和上次采集时间差
                 if prev_t_abs_ns is not None:
                     dt_list.append(t_abs_ns - prev_t_abs_ns)
+                # 记录采集时间
                 prev_t_abs_ns = t_abs_ns
-                # 记录延迟
+                # 记录滞后时间
                 lag_ns = t_abs_ns - next_ns
                 # 记录相对时间
                 t_rel_ns = t_abs_ns - start_ns
-                # 获取游戏及键盘数据
+                # 获取数据
                 observation = self._session.get_observation()
+                # 获取键盘输入
                 keystates = self._keyboard_hook.snapshot()
                 # 拼接事件
                 event = {
@@ -122,17 +155,41 @@ class CollectExpert:
                     "frame_idx": frame_idx,
                     "eps_id": self.eps_id,
                     "observation": observation.model_dump(),
-                    "key_states": keystates.model_dump()
+                    "key_states": keystates.model_dump(),
                 }
-                # 写数据
+                # 写入事件
                 self._writer.write_event(event)
-                # 更新计数器
+                # 采集图像
+                # 判断是否需要采集图像
+                if (
+                    t_abs_ns - last_vision_ns >= VISION_INTERVAL_NS
+                    and observation.window_focused
+                ):
+                    # 采集图像时间
+                    t0 = time.perf_counter_ns()
+                    # 采集图像
+                    image = self._vision.capture()
+                    # 记录图像采集时间差
+                    cap_list.append(time.perf_counter_ns() - t0)
+                    # 入队图像
+                    self._writer.enqueue_image(image, frame_idx, t_rel_ns)
+                    # 记录采集时间
+                    last_vision_ns = t_abs_ns
+
                 frame_idx += 1
-                # 更新next_ns
                 next_ns += INTERVAL_NS
 
-                # 结束判断
-                # f12终止
+                # 结束逻辑
+                # 判断是否写盘错误
+                if self._writer.image_error is not None:
+                    # 记录结束原因
+                    self._end_reason = "error"
+                    break
+                # 如果图像丢弃帧数超过最大丢弃帧数，记录结束原因
+                if self._writer.image_dropped > MAX_IMAGE_DROPPED:
+                    self._end_reason = "discard"
+                    break
+                # f12退出
                 if not self._keyboard_hook.is_running:
                     self._end_reason = "aborted"
                     break
@@ -144,22 +201,23 @@ class CollectExpert:
                 if t_rel_ns > MAX_DURATION_NS:
                     self._end_reason = "timeout"
                     break
-                # 跳过帧过多
+                # 丢弃帧数过多
                 if n_dropped >= MAX_DROPPED:
                     self._end_reason = "discard"
                     break
-                if observation.window_focused is False:
+                # 实焦过多
+                if not observation.window_focused:
                     n_loss += 1
                     if n_loss >= MAX_FOCUS_LOST:
                         self._end_reason = "discard"
                         break
                 else:
                     n_loss = 0
-                # 读取异常
+                # 内存读取失败过多
                 if observation.read_error_streak >= MAX_HP_READ_FAIL:
                     self._end_reason = "discard"
                     break
-                # 正常退出
+                # 胜利
                 if not observation.is_battle:
                     false_streak += 1
                     if false_streak >= DEBOUNCE:
@@ -169,13 +227,19 @@ class CollectExpert:
                 else:
                     false_streak = 0
         except Exception:
+            # 意外终止
             self._end_reason = "error"
             raise
         finally:
             if self._writer is not None:
+                # 计算整帧采样性能
                 dt_p50 = percentile_ns(dt_list, 0.50)
                 dt_p95 = percentile_ns(dt_list, 0.95)
+                # 计算整帧采样率
                 hz_meas = (1e9 / dt_p50) if dt_p50 else None
+                # 计算图像采集性能
+                cap_p50 = percentile_ns(cap_list, 0.50)
+                cap_p95 = percentile_ns(cap_list, 0.95)
                 self._writer.close(
                     self._end_reason,
                     n_dropped,
@@ -185,30 +249,32 @@ class CollectExpert:
                     sample_hz_nominal=self._config.collect["sample_hz"],
                     sample_hz_measured=hz_meas,
                     dt_p50_ns=dt_p50,
-                    dt_p95_ns=dt_p95
+                    dt_p95_ns=dt_p95,
+                    vision_hz=float(c["vision_hz"]),
+                    vision_region=dict(c["vision_region"]),
+                    vision_format=c.get("vision_format", "jpg"),
+                    vision_quality=int(c.get("vision_jpeg_quality", 85)),
+                    vision_color_order="RGB",
+                    capture_ms_p50=(cap_p50 / 1e6) if cap_p50 else None,
+                    capture_ms_p95=(cap_p95 / 1e6) if cap_p95 else None,
                 )
-            
+
     def start_collect(self):
-        """
-        开始收集
-        """
         try:
             if not self._pre_collect():
-                return 
+                return
             self._collect_data()
         finally:
             self._end_collect()
 
     def _end_collect(self):
-        """
-        结束收集，关闭所有进程
-        """
         self._writer = None
         self._keyboard_hook.stop()
         self._session.detach()
+        self._vision.stop()
         print("收集结束, 所有进程已关闭")
 
-        
+
 if __name__ == "__main__":
     config = load_config()
     batch_id = "smoke_1"

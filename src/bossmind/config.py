@@ -8,6 +8,7 @@ from pydantic import BaseModel, ValidationError
 
 class Config(BaseModel):
     process_name: str
+    window_title: str
     player_info: dict
     boss_info: dict
     keybinds: dict
