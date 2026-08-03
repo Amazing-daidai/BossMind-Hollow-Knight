@@ -55,6 +55,9 @@ class CollectExpert:
         )
         # 写入前准备
         self._writer.pre_write()
+        for i in range(3, 0, -1):
+            print(f"{i}...")
+            time.sleep(1)
         print("收集准备完成")
         return True
 
@@ -108,7 +111,8 @@ class CollectExpert:
                     self._recording_state = False
                     break
                 time.sleep(0.01)
-            # 下一采集时间
+            # 录帧前清掉等待战斗期间积压的 pressed
+            self._keyboard_hook.snapshot()
             next_ns = start_ns = time.perf_counter_ns()
             # 开始时间
             started_at_unix_ns = time.time_ns()

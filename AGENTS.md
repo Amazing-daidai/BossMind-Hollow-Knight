@@ -64,46 +64,53 @@ is_battle = (game_state == PLAYING)
 
 | 字段 | 值 |
 |------|-----|
-| 阶段 | **B 机 smoke / 管线实采** |
-| 子课 | pull 后 probe 全绿 → `smoke_*` 连打验收 |
+| 阶段 | **Phase 1 — B 机 smoke 已通过，进入 CE N2** |
+| 子课 | CE 挖 scene / game_state / 坐标 / boss → 接 `memory.py` → 再开 `expert_v1_*` |
+| Git | `main` @ `92d1828`（Phase 1.2）；B 机本地有 smoke 数据 + frame0 修复（待 commit） |
 | 采集判定 | **GO pipeline smoke only**（`batch_id` 须 `smoke_` / `pipeline_`） |
-| 正式训练批次 | **NO**（等 CE + `is_battle` 真值） |
-| 底层策略 | **冻结**（memory/记拍/schema major 勿再抠）；例外：可复现崩坏 + CE 波次 |
-| soul | **暂搁**：拿到 CE 偏移再接；未接前 soul 可为 None |
+| 正式训练批次 | **NO**（等 CE N2 + 真 `is_battle`） |
+| B 机 smoke | **3 局** `data/raw/smoke_1/`；最新 `20260801_215332`：3493 帧、60Hz、0 dropped |
+| 记拍 | **冻结** `held` + `pressed`（快速按键无 held 漏记；pressed 保留子帧边沿） |
+| soul | **已接** `MPCharge` @ PlayerData `+0x1D4`（yaml 已有；smoke 验证 35→2 随治疗） |
+| frame0 | **已修** `collect_expert` 录帧前 `snapshot()` 清积压 |
+| 更新 | 2026-08-01 |
 
-**已完成**
-
-- [x] 采集管线：config / schema / writer / collect（60Hz、追帧、held/pressed、meta、失焦、HP streak）
-- [x] S0/S1：拼写、`except`、max_hp 上界、pressed 去重、boss 名、`probe_keyboard`
-- [x] F0：timeout、`wait is_battle` 进 try/finally、batch 前缀闸门
-- [x] F1-4：采集阈值进 `collect:`（`max_episode_s` / `max_hp_read_fail` / `max_focus_lost` / `max_dropped`）
-- [x] `max_hp_offset: 0x19C`；probe 走 `get_player_states` / `get_observation`
+- [x] Phase 0 收官（`probe_loop` 10/10，`results/phase0.md`）
+- [x] Phase 1.1：`keyboard_hook` + `probe_keyboard`（`6b61b60`）
+- [x] Phase 1.2：采集管线 config/schema/writer/`collect_expert`（`92d1828`）
+- [x] B 机 smoke：`smoke_1` 三局；frame0 / heal / 快速按键验收通过
+- [ ] CE N2：scene / game_state / player x,y / boss / 真 `is_battle`
 
 ---
 
 ## 3. 本轮清单与验收
 
-### 代码侧（已齐，可 push）
+### 代码侧（`92d1828` 已 push，B 待跑）
 
 | ID | 任务 | 状态 |
 |----|------|------|
 | S0/S1 | smoke 前门禁 | ✅ |
 | F0-2/3/4 | timeout / finally / batch+boss 口径 | ✅ |
-| F1-4 | collect 常量外置 yaml | ✅ |
-| F0-1 soul 短路 | **用户选择暂搁**（等偏移） | ⏸ |
-| F1-1 stale hp 文档 | 见 §1 hp 语义 | ✅ |
-| F1-2 日志降噪 | 可选 backlog | — |
-| F1-3 check_episode | 可选 backlog | — |
+| F1-4 | collect 阈值进 yaml | ✅ |
+| F0-1 soul | `MPCharge` @ `+0x1D4` 已写入 yaml 并 smoke 验证 | ✅ |
+| B smoke | probe 全套 + `smoke_*` 采集 | ✅ |
+| CE N2 | scene / game_state / 坐标 / boss | ☐ **当前** |
+| F1-2 日志降噪 | backlog | — |
+| F1-3 check_episode | backlog | — |
 
 ### B 机 smoke 顺序（pull 后）
 
 ```text
-1. probe_attach → probe_hp（hp/max_hp 非 None；注意 soul 未接可能刷日志）
-2. probe_keyboard（held 稳、pressed 边沿合理）
-3. probe_loop（读档 10 轮）
-4. collect：batch_id=smoke_* ，2～5 局（含 F12 / death或timeout）
+1. git pull && pip install -e .
+2. probe_attach → probe_hp（hp/max_hp 非 None；soul 未接可能刷日志）
+3. probe_keyboard（held 稳、pressed 边沿合理）
+4. probe_loop（读档 10 轮；Boss 场景 `GG_Hornet_1`）
+5. python scripts/collect_expert.py  # batch_id=smoke_YYYYMMDD_*
+   2～5 局（含 F12 / death 或 timeout）
    检查 meta：dt_p95、n_dropped、hp 有变化、read_error_streak 近 0
 ```
+
+**B 机 smoke 摘要（2026-08-01）**：`smoke_1` 三局；`215332` 局 frame0 干净、治疗 frame 2826–2927 / HP 1→2、快速按键无 held 漏记；`held`+`pressed` 保留。
 
 ### 明确不做（底层冻结）
 
@@ -113,9 +120,9 @@ PointerChain / Config 大重构 / 完整 tests+CI / Writer 大改
 为「优雅」改记拍或 held/pressed
 ```
 
-### 波 N2 — CE（smoke 稳定之后）
+### 波 N2 — CE（smoke 已通过，当前）
 
-scene / game_state / soul / x,y / boss / `is_battle` 派生 → 抽检 → 再开 `expert_v1_*`。
+scene / game_state / player x,y / boss / 真 `is_battle` 派生 → 抽检 → 再开 `expert_v1_*`。（soul 已完成）
 
 ---
 
@@ -137,8 +144,11 @@ results/phase0.md
 
 | 日期 | 事件 |
 |------|------|
-| 2026-08-01 | F1-4：collect 阈值进 yaml；batch 闸门；底层冻结宣言；准备 push → B smoke |
-| 2026-08-01 | F0：timeout / try-finally；soul 暂搁等 CE 偏移 |
+| 2026-08-01 | **B smoke 通过**：`smoke_1` 三局；frame0 修复；soul/治疗/快速按键验收；记拍保留双轨 |
+| 2026-08-01 | **进度同步**：Phase 1.2 已 push；`GG_Hornet_1` 为当前 Boss 场景 |
+| 2026-08-01 | Phase 1.2 提交 `92d1828`：collect 管线 + F0/F1 加固 |
+| 2026-08-01 | F1-4：collect 阈值进 yaml；batch 闸门；底层冻结宣言 |
+| 2026-08-01 | F0：timeout / try-finally；soul `MPCharge` @ `+0x1D4` 已接 |
 | 2026-08-01 | Opus 复评 S0/S1；非 CE 加固大部完成 |
 | 2026-07-31 | 观测源/schema 版本/`is_battle` 语义定稿 |
 | 2026-07-30 | 协作铁律；Phase 1 启动 |
