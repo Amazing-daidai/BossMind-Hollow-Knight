@@ -29,6 +29,8 @@ keybinds:
   dream_knife: f
   heal: l
   skill: k
+  inventory: i
+  tab: tab
   esc: esc
 menu:
   quit_to_title:

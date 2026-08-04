@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field, ValidationError
 from typing import Literal
 
-SCHEMA_VERSION = "1.1.0"
+SCHEMA_VERSION = "1.1.1"
 
 # 按键数据
 class ButtonStates(BaseModel):
@@ -16,6 +16,7 @@ class ButtonStates(BaseModel):
     dream_knife: bool = Field(default=False)
     heal: bool = Field(default=False)
     skill: bool = Field(default=False)
+    tab: bool = Field(default=False)
 
 class KeyStates(BaseModel):
     held: ButtonStates = Field(default_factory=ButtonStates)
@@ -23,21 +24,21 @@ class KeyStates(BaseModel):
 
 # 玩家状态
 class PlayerStates(BaseModel):
-    hp: int | None = None
-    x: float | None = None
-    y: float | None = None
+    player_hp: int | None = None
+    player_x: float | None = None
+    player_y: float | None = None
     soul: int | None = None
     max_hp: int | None = None
-    facing_right: bool | None = None
-    on_ground: bool | None = None
+    player_facing_right: bool | None = None
+    player_on_ground: bool | None = None
 
 # boss状态
 class BossStates(BaseModel):
-    hp: int | None = None
-    x: float | None = None
-    y: float | None = None
-    facing_right: bool | None = None
-    on_ground: bool | None = None
+    boss_hp: int | None = None
+    boss_x: float | None = None
+    boss_y: float | None = None
+    boss_facing_right: bool | None = None
+    boss_on_ground: bool | None = None
 
 # 游戏数据
 class Observation(BaseModel):

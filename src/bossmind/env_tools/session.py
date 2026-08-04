@@ -85,14 +85,14 @@ class GameSession:
         game_pid = self.get_pid()
         window_focused = is_window_focused(game_pid)
         player_states = self._player_info.get_player_states()
-        raw_hp = player_states.hp
+        raw_hp = player_states.player_hp
         if raw_hp is not None:
             self._last_hp = raw_hp
             self._hp_fail_streak = 0
-            player_states.hp = raw_hp
+            player_states.player_hp = raw_hp
         else:
             self._hp_fail_streak += 1
-            player_states.hp = self._last_hp   # 用上一帧填充，可能失真，后续改。
+            player_states.player_hp = self._last_hp   # 用上一帧填充，可能失真，后续改。
         boss_states = BossStates()
         observation = Observation(player=player_states, boss=boss_states, is_battle=self.get_is_battle(), window_focused=window_focused, read_error_streak=self._hp_fail_streak)
         return observation

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import time
+from datetime import datetime
 from pathlib import Path
 from queue import Queue
 
@@ -11,6 +12,7 @@ import pytest
 from PIL import Image
 
 from bossmind.data.writer import EpisodeWriter
+from bossmind.paths import RAW_DATA_DIR
 
 
 class FakeShot:
@@ -37,10 +39,22 @@ def _keys_off() -> dict[str, bool]:
         "dream_knife": False,
         "heal": False,
         "skill": False,
+        "tab": False,
     }
 
 
-def _fake_event(eps_id: str, frame_idx: int, t_rel_ns: int) -> dict:
+def _fake_event(
+    eps_id: str,
+    frame_idx: int,
+    t_rel_ns: int,
+    *,
+    player_hp: int = 9,
+    boss_hp: int | None = 800,
+    is_battle: bool = True,
+    held: dict[str, bool] | None = None,
+    pressed: dict[str, bool] | None = None,
+) -> dict:
+    """一帧假事件，字段对齐 schema 1.1.x。"""
     return {
         "t_ns": 1_000_000_000_000 + t_rel_ns,
         "t_rel_ns": t_rel_ns,
@@ -48,15 +62,57 @@ def _fake_event(eps_id: str, frame_idx: int, t_rel_ns: int) -> dict:
         "frame_idx": frame_idx,
         "eps_id": eps_id,
         "observation": {
-            "player": {"hp": 9},
-            "boss": {},
-            "is_battle": True,
+            "player": {
+                "player_hp": player_hp,
+                "player_x": 15.0 + frame_idx,
+                "player_y": 27.658,
+                "soul": 33,
+                "max_hp": 9,
+                "player_facing_right": True,
+                "player_on_ground": True,
+            },
+            "boss": {
+                "boss_hp": boss_hp,
+                "boss_x": 40.0,
+                "boss_y": 27.658,
+                "boss_facing_right": False,
+                "boss_on_ground": True,
+            },
+            "window_focused": True,
+            "is_battle": is_battle,
+            "scene_name": "GG_Hornet_1",
+            "game_state": "PLAYING",
+            "read_error_streak": 0,
         },
         "key_states": {
-            "held": _keys_off(),
-            "pressed": _keys_off(),
+            "held": held if held is not None else _keys_off(),
+            "pressed": pressed if pressed is not None else _keys_off(),
         },
     }
+
+
+def _win_episode_events(eps_id: str) -> list[dict]:
+    """一局假数据：开战 → 输出 → 战斗结束（供 end_reason=win）。"""
+    attack = {**_keys_off(), "attack": True}
+    return [
+        _fake_event(eps_id, 0, 0, boss_hp=800, is_battle=True),
+        _fake_event(
+            eps_id,
+            1,
+            20_000_000,
+            boss_hp=200,
+            is_battle=True,
+            held=attack,
+            pressed=attack,
+        ),
+        _fake_event(
+            eps_id,
+            2,
+            40_000_000,
+            boss_hp=0,
+            is_battle=False,
+        ),
+    ]
 
 
 @pytest.fixture
@@ -103,23 +159,36 @@ def test_enqueue_then_close_writes_jpgs_and_stops_thread(writer: EpisodeWriter, 
     assert meta["image_error"] is None
 
 
-def test_events_and_images_together(writer: EpisodeWriter, tmp_path: Path):
+def test_write_fake_win_episode(writer: EpisodeWriter, tmp_path: Path):
+    """写入一局假数据：3 事件 + 3 图，end_reason=win。"""
     shot = FakeShot(fill=80)
-    for i in range(3):
-        writer.write_event(_fake_event(writer.eps_id, i, i * 20_000_000))
-        writer.enqueue_image(shot, frame_idx=i, t_rel_ns=i * 20_000_000)
+    events = _win_episode_events(writer.eps_id)
+    for ev in events:
+        writer.write_event(ev)
+        writer.enqueue_image(shot, frame_idx=ev["frame_idx"], t_rel_ns=ev["t_rel_ns"])
 
-    writer.close(end_reason="timeout", n_dropped=2)
+    writer.close(end_reason="win", n_dropped=0)
 
     eps = tmp_path / "test_batch" / "eps_vision_1"
     lines = (eps / "events.jsonl").read_text(encoding="utf-8").strip().splitlines()
     assert len(lines) == 3
+
+    parsed = [json.loads(line) for line in lines]
+    assert parsed[0]["observation"]["boss"]["boss_hp"] == 800
+    assert parsed[0]["observation"]["is_battle"] is True
+    assert parsed[1]["observation"]["boss"]["boss_hp"] == 200
+    assert parsed[1]["key_states"]["pressed"]["attack"] is True
+    assert parsed[2]["observation"]["boss"]["boss_hp"] == 0
+    assert parsed[2]["observation"]["is_battle"] is False
+
     assert len(list((eps / "frames").glob("*.jpg"))) == 3
 
     meta = json.loads((eps / "meta.json").read_text(encoding="utf-8"))
+    assert meta["end_reason"] == "win"
     assert meta["n_events"] == 3
-    assert meta["n_dropped"] == 2
+    assert meta["n_dropped"] == 0
     assert meta["n_frames"] == 3
+    assert meta["boss"] == "GG_Hornet_1"
 
 
 def test_close_is_fast_when_queue_empty(writer: EpisodeWriter):
@@ -221,3 +290,31 @@ def test_drop_oldest_does_not_eat_sentinel(tmp_path: Path, monkeypatch: pytest.M
     w._image_stop.clear()
     assert w.enqueue_image(FakeShot(), 99, 0) is False
     assert w.image_queue.get_nowait() is None
+
+
+def write_fake_win_episode(
+    batch_id: str = "pipeline_fake",
+    boss_name: str = "GG_Hornet_1",
+) -> Path:
+    """写一局假 win 数据到 RAW_DATA_DIR，返回 episode 目录。"""
+    eps_id = datetime.now().strftime("%Y%m%d_%H%M%S") + "_fake_win"
+    w = EpisodeWriter(batch_id, eps_id, boss_name, image_ext="jpg", jpeg_quality=85)
+    w.pre_write()
+    shot = FakeShot(width=64, height=36, fill=80)
+    for ev in _win_episode_events(eps_id):
+        w.write_event(ev)
+        w.enqueue_image(shot, frame_idx=ev["frame_idx"], t_rel_ns=ev["t_rel_ns"])
+    w.close(end_reason="win", n_dropped=0)
+    return RAW_DATA_DIR / batch_id / eps_id
+
+
+if __name__ == "__main__":
+    eps_dir = write_fake_win_episode()
+    meta = json.loads((eps_dir / "meta.json").read_text(encoding="utf-8"))
+    n_jpg = len(list((eps_dir / "frames").glob("*.jpg")))
+    n_ev = len((eps_dir / "events.jsonl").read_text(encoding="utf-8").strip().splitlines())
+    print(f"wrote: {eps_dir}")
+    print(
+        f"end_reason={meta['end_reason']} n_events={n_ev} "
+        f"n_frames={n_jpg} duration={meta['duration']:.3f}s"
+    )

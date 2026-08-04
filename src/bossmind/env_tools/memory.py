@@ -301,7 +301,7 @@ class PlayerInfo:
         soul = self._get_player_soul()  # 使用hp和max_hp已经校验地址链正确性，灵魂值暂不增加额外校验
         x = self._get_x()
         y = self._get_y()
-        return PlayerStates(hp=hp, max_hp=max_hp, soul=soul, x=x, y=y)
+        return PlayerStates(player_hp=hp, max_hp=max_hp, soul=soul, player_x=x, player_y=y)
 
 
     def get_is_battle(self):

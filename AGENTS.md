@@ -26,9 +26,9 @@
 | Phase 1 观测源 | **进程内存**（CE / Mono 指针链），不用 Mod 广播 |
 | 采集与评估 | **必须同源**（同一套 `get_observation()` / `Vision.capture`） |
 | Boss 字段 | 短期 CE/Mono；挖不通则批次标 `pipeline_only`，不进训练集 |
-| 采样率 | 正式批次 **60Hz** 事件；视觉旁路 **10Hz** 固定战斗 ROI（先测再调） |
+| 采样率 | 正式批次 **60Hz** 事件；视觉旁路 **10Hz** 固定战斗 ROI |
 | Boss 标识 | meta.`boss` 为 `str`，取值建议场景名如 `GG_Hornet_1` |
-| 动作标签 | 键盘钩子：`held` + `pressed` 边沿 |
+| 动作标签 | 键盘钩子：`held` + `pressed` 边沿；逻辑键含 **tab**（12 维） |
 | hp 语义 | `session` 读失败时用上一帧填充；**真失败看 `read_error_streak>0`**，训前过滤 |
 | 图像 | **硬需求**：截图/写盘失败 → `end_reason=error`；队列丢帧超限 → `discard` |
 
@@ -39,17 +39,17 @@
 | 加可空字段 | minor（1.0→1.1） | 可混训（补 None） |
 | 改名 / 改语义 / 改必填 | **major**（1→2） | **禁止混训** |
 
-当前 `SCHEMA_VERSION = 1.1.0`（vision provenance：`vision_*` / `capture_ms_*` / `image_error` 等可空）。
+当前工作树 `SCHEMA_VERSION = 1.1.1`：vision provenance 保留；新增 `tab`；`PlayerStates`/`BossStates` 字段改为 `player_hp` / `player_x` 等前缀名（**与 20260803 旧 smoke 的 `hp/x/y` 不兼容**，BC 用新采或 `pipeline_fake`）。
 
 ### `is_battle` 语义（派生，原料必须落盘）
 
 ```text
 is_battle = (game_state == PLAYING)
          AND (scene_name in 允许的 Boss 场景)
-         AND (boss.hp is not None AND boss.hp > 0)
+         AND (boss.hp is not None AND boss.hp > 0)   # 落盘字段名以 schema 为准（现为 boss_hp）
 ```
 
-当前 `memory.get_is_battle` 仍为占位恒 `True` → **不会产生 `end_reason=win`**；在 CE 接好之前只允许 `smoke_*` / `pipeline_*` 批次，**禁止** `expert_v1_*`。
+当前 `memory.get_is_battle` 仍为占位恒 `True` → **不会产生可靠 `end_reason=win`**；在 CE 接好之前只允许 `smoke_*` / `pipeline_*`，**禁止** `expert_v1_*`。
 
 ### 协作铁律（Agent 必读）
 
@@ -57,113 +57,112 @@ is_battle = (game_state == PLAYING)
 |------|------|
 | **师父模式** | 用户自行实现；Agent：讲思路、给步骤、审代码、排错 |
 | **禁止代写** | 除非用户明确要求「请代写 xxx」 |
-| **推进节奏** | 本轮：CE N2（scene / game_state / boss / 真 `is_battle`）→ `expert_v1_*` 门禁 |
+| **推进节奏** | **双线**：CE N2（scene/game_state/boss）∥ L3 BC stub（BC.2→过拟合）；正式 `train_bc` / `expert_v1` 仍门禁 |
 
-**双设备**：A=`D:\BossMind`；B=`E:\BossMind`（HK/采数）；conda `BossMind` 3.12.13。
+**双设备**：A=`D:\BossMind`（可 CPU PyTorch 写/测 BC）；B=`E:\BossMind`（HK/采数/CE）；conda `BossMind` 3.12.13。  
+正式大训仍预定 **WSL + ROCm**（见 `requirements.txt` 头注释）；A 机 CPU torch **仅临时开发**。
 
 ---
 
-## 2. 当前状态（2026-08-03）
+## 2. 当前状态（2026-08-04）
 
 | 字段 | 值 |
 |------|-----|
-| 阶段 | **Phase 1.3 x/y 采集冒烟通过；待 CE N2 + 真 `is_battle`** |
-| 子课 | CE N2（scene / game_state / boss）→ 真 `is_battle` → `expert_v1_*` |
-| Git | `main` @ `5f82519`（vision 合入 + 坐标 yaml；`memory.py` x/y 本地已接） |
-| 采集判定 | **GO pipeline smoke**（`smoke_*` / `pipeline_*`）；**NO** `expert_v1_*` |
-| B 机 x/y smoke | **3 局** `smoke_1/20260803_*`（见 §3 摘要）；60Hz + 10Hz 图 **通过** |
-| B 机事件 smoke（旧） | 2026-08-01 `smoke_1` 三局；frame0 / heal / 快键 |
-| 视觉 | ROI 已标定 `190,230,1550×740`；`capture_ms_p95` **6.8–8.9 ms** |
-| HP / soul | 链稳定；受伤当帧降 HP；soul 战斗中 33 步进正常 |
-| 坐标 | `memory.py` **已接** x/y；神居房地面 **y≈27.658**（与探针 5.658 不同场景） |
-| 坐标语义 | 受击：**HP 当帧降，y 延迟 ~0.3s**（击退弧）；超冲：**长按 h 松手后 x 爆发、y 平坦** |
+| 阶段 | **双线：CE N2 进行中 ∥ L3 BC.0–1 已完成，下一课 BC.2** |
+| 子课 A | BC.2：`PolicyMLP` + BCEWithLogits；假数据/`load_episode` 能 backward |
+| 子课 B | CE N2：scene / game_state / boss → 真 `is_battle` |
+| Git | `origin/main` @ `3dba95b`；**本地未提交**：`learning/`、schema/tab、deps 等 |
+| 采集判定 | **GO** `smoke_*` / `pipeline_*`；**NO** `expert_v1_*` |
+| B 机 x/y+vision smoke | 三局 `20260803_*` 已通过（字段名为旧 `hp/x/y`） |
+| 视觉 | ROI `190,230,1550×740`；`capture_ms_p95` 6.8–8.9ms → **暂不异步截图** |
+| L3 BC | `src/bossmind/learning/`：`actions.py`（BC.0）+ `dataset.py`（BC.1） |
+| BC 标签 | `held`→12 维（含 tab）；样本 `(x, a)`；第一版只用 held |
+| BC 过滤 | `load_batch` 仅 `end_reason==win`（真数据暂少）；通路/过拟合用 **`load_episode`** |
+| PyTorch（A） | 计划/可装 **CPU Stable**：`pip install torch --index-url https://download.pytorch.org/whl/cpu` |
+| 依赖 | `jsonlines>=4.0,<5` 已写入 `requirements.txt` / `pyproject.toml` `[data]` |
 | 朝向 | 未接；低优先级 |
-| 更新 | 2026-08-03 |
+| 更新 | 2026-08-04 |
 
-- [x] Phase 0 收官（`probe_loop` 10/10，`results/phase0.md`）
-- [x] Phase 1.1：`keyboard_hook` + `probe_keyboard`（`6b61b60`）
-- [x] Phase 1.2：采集管线 config/schema/writer/`collect_expert`（`92d1828`）
-- [x] B 机事件 smoke：`smoke_1` 三局；frame0 / heal / 快速按键验收通过
-- [x] Phase 1.3：`Vision` + ImageWriter JPEG + schema 1.1.0；与 B `main` 合并（`89c3a7a`）
-- [x] B 机坐标 CE + `memory.py` x/y 接线
-- [x] B 机 x/y + vision **联合冒烟**（`20260803_221846` / `222026` / `222253`）
+- [x] Phase 0～1.3：探针 / 采集 / vision / x/y 联合冒烟（见既有里程碑）
+- [x] BC.0：`ACTION_KEY` + `key_to_vec` / `obs_to_vec`（含 tab；obs 可含 None/bool，进张量前再收）
+- [x] BC.1：`load_episode` + `load_batch`（假局 `pipeline_fake` 验证）
+- [ ] BC.2：PolicyMLP + BCEWithLogits + backward
+- [ ] BC.3：单局过拟合
 - [ ] CE N2 余下：scene / game_state / boss / 真 `is_battle`
+- [ ] BC.4 / 正式 `train_bc`：等 CE + `expert_v1` 门禁
 
 ---
 
 ## 3. 本轮清单与验收
 
-### 代码侧（`5f82519`）
+### 代码侧
 
 | ID | 任务 | 状态 |
 |----|------|------|
-| S0/S1 | smoke 前门禁 | ✅ |
-| F0 / F1-4 | timeout / finally / batch / collect 阈值 yaml | ✅ |
-| F0-1 soul | `+0x1D4` yaml + memory | ✅ |
-| B 事件 smoke | probe + `smoke_*` | ✅ |
-| V1 vision | `vision.py` / writer 队列 / collect 10Hz / tests | ✅ |
-| V1 审阅 | 改动 1–9 保留（3 去掉客户区/黑图判定） | ✅ |
-| CE 坐标 yaml | `player_position` 静态链 B 验证 | ✅ |
-| memory x/y | `PlayerInfo` 读坐标 + 写入 `events.jsonl` | ✅ |
-| B x/y+vision smoke | 三局 `20260803_*`；meta/帧/坐标/按键对齐 | ✅ |
-| CE N2 余下 | scene / game_state / boss / 真 `is_battle` | ☐ **当前** |
-| 朝向 | `facingRight`（可选，Mono） | backlog |
-| 异步截图 | 仅当 `capture_ms_p95` 紧张再做 | backlog |
-| F1-2 / F1-3 | 日志降噪 / check_episode | backlog |
+| … | Phase 0～1.3 / B smoke / vision 审阅（既有） | ✅ |
+| schema 1.1.1 | `tab`；`player_*` / `boss_*` 字段前缀；探针/collect 已跟名 | 本地 ✅ 待 commit |
+| BC.0 | `learning/actions.py` | ✅ |
+| BC.1 | `learning/dataset.py`（`(x,a)`；`jsonlines`） | ✅ |
+| deps | `jsonlines`；A 机 CPU torch（用户装） | ✅ / 进行中 |
+| BC.2 | `learning/policy.py` MLP | ☐ **当前（A）** |
+| CE N2 | scene / game_state / boss / 真 `is_battle` | ☐ **当前（B）** |
+| 朝向 / 异步截图 / F1-2/3 | backlog | — |
+| 正式 `train_bc` / `expert_v1` | **冻结**至 CE 门禁 | 冻 |
 
-### B 机采集冒烟（2026-08-03 已通过；新项目复跑可照此清单）
+### B 机采集冒烟（2026-08-03 已通过）
 
 ```text
 1. git pull && pip install -e .
-2. 确认 window_title / 实机标定 collect.vision_region
-3. probe_attach → probe_hp（soul 应非 None）→ probe_keyboard → probe_loop
-4. python scripts/collect_expert.py  # smoke_* ；2～3 局
-5. 查 meta：dt_p95、n_dropped、image_dropped、n_frames、
-   capture_ms_p50/p95、image_error；目检 frames/*.jpg
-闸门：capture_ms_p95 < 10ms → 暂不异步截图；≥30ms 或频繁丢帧再开 VisionWorker
+2. window_title / vision_region
+3. probe_attach → probe_hp → probe_keyboard → probe_loop
+4. collect_expert smoke_* ；查 meta + frames
+闸门：capture_ms_p95 < 10ms → 暂不异步截图
 ```
 
 **B 机 x/y+vision 冒烟（2026-08-03）** — `smoke_1/20260803_{221846,222026,222253}`：
 
 ```text
-闸门（三局共性）：sample_hz_measured≈60.08；n_dropped=0；image_dropped=0；
-  capture_ms_p95 6.8–8.9ms；x/y 无 null；read_error_streak=0；frame0 pressed 干净。
-局1 221846：~42s/2508 事件；HP 9→6；jump×9。
-局2 222026：~35s/2118 事件；HP 9→7；jump×2（小跳）；
-  受击 f1001 HP↓，f1020 起 y 升（无 jump，击退弧 ~19 帧延迟）。
-局3 222253：~43s/2606 事件；HP 9→5；jump×18；下砸 down+attack 多段；
-  超冲 f1788 长按 h（87 帧）→ f1875 松开：x 15.9→35.7（左→右），y≈35.33 平坦。
+闸门：≈60.08Hz；n_dropped=0；image_dropped=0；capture_ms_p95 6.8–8.9ms；
+  x/y 无 null；read_error_streak=0；frame0 pressed 干净。
+局2 受击：HP 当帧↓，y 延迟 ~19 帧升。局3 超冲：长按 h 松手后 x 爆发、y 平坦。
 ```
 
-**分析注意**：判受伤看 **HP 当帧 + 延迟 y/x 轨迹**；判超冲看 **长按 super_dash + 松手后 x 爆发且 y 不变**；`pressed.jump` 不等于起跳（硬直帧可无 y 变化）。
+**分析注意**：判受伤看 HP 当帧 + 延迟 y；判超冲看长按 `super_dash` + 松手后 x；`pressed.jump`≠起跳。
 
-**B 机事件 smoke（2026-08-01）**：`215332` frame0 干净、治疗 HP 1→2、快键无 held 漏记。
+### L3 BC stub 步骤（A 机）
+
+```text
+BC.0 ✅ 键序+向量   BC.1 ✅ 读局   BC.2 ☐ MLP+backward
+BC.3 ☐ 单局过拟合   BC.4 ☐ 过滤+正式训（等 CE）
+过拟合/通路：load_episode(路径)；勿依赖 load_batch 的 win 过滤
+进 tensor 前：None→0.0，bool→0/1 float；BCEWithLogits（logits 勿先 sigmoid）
+```
 
 ### 明确不做（仍冻结）
 
 ```text
+启发式假 is_battle / expert_v1_* / 正式 train_bc
 PointerChain / Config 大重构 / 完整 tests+CI
-启发式假 is_battle / expert_v1_* / train_bc
-为「优雅」改记拍或 held/pressed
-未测紧张前不上异步截图 / DXGI
+为「优雅」改记拍；未紧张不上异步截图 / DXGI
+A 机不装 CUDA/ROCm 版 PyTorch（临时 CPU 即可）
 ```
 
 ### 波 N2 — CE
 
-`player_position` yaml **已验证**；`memory.py` x/y **已写入采集**。  
-**待做**：scene / game_state / boss → 真 `is_battle` → `expert_v1_*`。  
-**不用** `GameManager._instance`；朝向可后补 Mono `facingRight`。
+坐标已采。**待做**：scene / game_state / boss → 真 `is_battle` → `expert_v1_*`。  
+不用 `GameManager._instance`；朝向可后补。
 
 ---
 
 ## 4. 仓库
 
 ```text
-configs/game_info.yaml          # collect.max_* / vision_*；player_position
+configs/game_info.yaml
 scripts/{probe_*,collect_expert}.py
 src/bossmind/{config,paths,utils}.py
-src/bossmind/data/{schema,writer}.py   # schema 1.1.0；ImageWriter 异步 JPEG
+src/bossmind/data/{schema,writer}.py          # 1.1.1；ImageWriter
 src/bossmind/env_tools/{memory,input,session,keyboard_hook,vision}.py
+src/bossmind/learning/{actions,dataset}.py    # L3 BC stub；policy 待写
 src/bossmind/env_tools/reset_backends/{menu,mod}.py
 tests/{test_vision,test_episode_writer_images}.py
 results/phase0.md
@@ -175,12 +174,10 @@ results/phase0.md
 
 | 日期 | 事件 |
 |------|------|
-| 2026-08-03 | **B x/y+vision 冒烟通过**：三局 `20260803_*`；60Hz/10Hz 无丢帧；坐标+按键+受击延迟/超冲模式已核对 |
-| 2026-08-03 | **坐标静态链 B 验收** + `memory.py` x/y；yaml `player_position`；朝向未接 |
-| 2026-08-03 | **main ← vision_feature**：`89c3a7a`；soul/坐标 yaml + vision 管线；AGENTS 同步 `5f82519` |
-| 2026-08-03 | Phase 1.3：10Hz ROI 截图、JPEG 写盘、meta provenance；性能评估：B 240Hz 先测再异步 |
-| 2026-08-01 | **B smoke 通过**：`smoke_1` 三局；frame0；soul/治疗/快键；记拍双轨 |
-| 2026-08-01 | Phase 1.2 `92d1828`：collect 管线 + F0/F1；soul `+0x1D4` |
-| 2026-07-31 | 观测源/schema 版本/`is_battle` 语义定稿 |
+| 2026-08-04 | **L3 BC 开工**：BC.0/1（`learning/actions|dataset`）；tab→12 维；schema 1.1.1 字段前缀；`jsonlines`；下一步 BC.2；CE N2 并行 |
+| 2026-08-03 | **B x/y+vision 冒烟通过**：三局 `20260803_*`；坐标+按键+受击/超冲模式核对 |
+| 2026-08-03 | 坐标链 + `memory` x/y；冒烟合入 `3dba95b`；vision 合入 `89c3a7a` |
+| 2026-08-01 | B 事件 smoke；Phase 1.2；soul `+0x1D4` |
+| 2026-07-31 | 观测源/schema/`is_battle` 定稿 |
 | 2026-07-30 | 协作铁律；Phase 1 启动 |
 | 2026-07-29 | Phase 0 收官 10/10 |

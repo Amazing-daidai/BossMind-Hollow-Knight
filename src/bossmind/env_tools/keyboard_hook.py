@@ -27,6 +27,7 @@ class KeyboardHook:
             "dream_knife": False,
             "heal": False,
             "skill": False,
+            "tab": False,
         }
         self._edge = {
             "left": False,
@@ -40,6 +41,7 @@ class KeyboardHook:
             "dream_knife": False,
             "heal": False,
             "skill": False,
+            "tab": False,
         }
         self._listener = None
         self._lock = threading.Lock()
@@ -67,6 +69,8 @@ class KeyboardHook:
                 return "lshift"
             elif key == pynput.keyboard.Key.space:
                 return "space"
+            elif key == pynput.keyboard.Key.tab:
+                return "tab"
             else:
                 return None
 

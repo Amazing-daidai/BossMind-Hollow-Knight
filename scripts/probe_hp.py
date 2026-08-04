@@ -13,7 +13,7 @@ try:
     while True:
         states = player.get_player_states()
         print(
-            f"hp={states.hp} max_hp={states.max_hp} soul={states.soul}"
+            f"hp={states.player_hp} max_hp={states.max_hp} soul={states.soul}"
         )
         time.sleep(0.2)
 except KeyboardInterrupt:

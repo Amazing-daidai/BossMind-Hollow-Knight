@@ -18,7 +18,7 @@ def main():
     try:
         game_session.attach()
         game_session.goto_boss_room("GG_Hornet_1")
-        hp_baseline = game_session.get_observation().player.hp
+        hp_baseline = game_session.get_observation().player.player_hp
         print(f"基线血量: {hp_baseline}")
         for i in range(10):
             print(f"第{i + 1}次读档")
@@ -26,7 +26,7 @@ def main():
             game_session.attach()
             game_session.goto_boss_room("GG_Hornet_1")
             obs = game_session.get_observation()
-            hp_after_reset = obs.player.hp
+            hp_after_reset = obs.player.player_hp
             print(
                 f"当前血量: {hp_after_reset}，"
                 f"是否与基线一致: {hp_after_reset == hp_baseline}，"

@@ -198,7 +198,7 @@ class CollectExpert:
                     self._end_reason = "aborted"
                     break
                 # 死亡
-                if observation.player.hp is not None and observation.player.hp <= 0:
+                if observation.player.player_hp is not None and observation.player.player_hp <= 0:
                     self._end_reason = "death"
                     break
                 # 超时
