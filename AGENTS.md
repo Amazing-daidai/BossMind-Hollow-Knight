@@ -50,7 +50,7 @@ is_battle = (game_state == PLAYING)
          AND (boss_hp is not None AND boss_hp > 0)
 ```
 
-`get_is_battle` 仍占位恒 `True` → 无可靠 `win`；仅 `smoke_*` / `pipeline_*`，**禁止** `expert_v1_*`。
+`get_is_battle()` **已实现**（`PLAYING` + `boss_info` 场景 + `boss_hp>0`）；`game_state==6` 过场几帧不算战斗。
 
 ### 协作铁律（Agent 必读）
 
@@ -59,6 +59,7 @@ is_battle = (game_state == PLAYING)
 | **师父模式** | 用户自行实现；Agent：讲思路、给步骤、审代码、排错 |
 | **禁止代写** | 除非用户明确要求「请代写 xxx」 |
 | **推进节奏** | **双线**：B 采数/CE N2 ∥ A BC 真数据验收→过拟合；正式 `train_bc`/`expert_v1` 门禁 |
+| **脚本纪律** | 不新增临时验收/CE 脚本；验收用既有 `probe_*`；CE 链存机外 sqlite |
 
 **双设备**：A=`D:\BossMind`（CPU PyTorch 写/测 BC）；B=`E:\BossMind`（HK/采数/CE）；conda `BossMind` 3.12.13。  
 正式大训预定 **WSL + ROCm**；A 机 CPU torch 仅开发。
@@ -69,9 +70,9 @@ is_battle = (game_state == PLAYING)
 
 | 字段 | 值 |
 |------|-----|
-| 阶段 | **BC 训练骨架已齐；朝向 yaml 已定；等 B 真数据验收 ∥ CE N2** |
-| 子课 A | B 机/新 schema 数据跑通 `BCPolicy.train` → BC.3 单局过拟合 |
-| 子课 B | CE：scene / game_state / boss → 真 `is_battle` |
+| 阶段 | **CE N2（Hornet）齐；真 `is_battle` 已接；可采 expert 前需 B 验收** |
+| 子课 A | B 机新 schema + `boss_hp` 采数 → `BCPolicy.train` → BC.3 过拟合 |
+| 子课 B | B 验收：走廊/房内/暂停 `is_battle`；正式 `expert_v1_*` 门禁 |
 | Git | **`main` ← `Phase-BC` 已合并** |
 | 采集判定 | **GO** `smoke_*` / `pipeline_*`；**NO** `expert_v1_*` |
 | B 机 x/y+vision smoke | 三局 `20260803_*` 已通过（字段名为旧 `hp/x/y`） |
@@ -79,16 +80,23 @@ is_battle = (game_state == PLAYING)
 | BC 样本 | `(x,a)`；`held` 12 维；**含 `None` 的 obs 帧 skip**；`load_batch` 仅 `end_reason==win` |
 | 特征表 | 仍含 facing/boss 等 → CE 未接前真数据可能大量 skip；训前可临时收窄 `PLAY_INFO`/`BOSS_INFO` |
 | 视觉 | ROI `190,230,1550×740`；`capture_ms_p95` 6.8–8.9ms → **暂不异步截图** |
-| 朝向 | yaml **`player_facing` 已写入**（`+0x01F4F8B8`；右=-1 左=+1 float）；**待** `memory.py` 接线 |
-| 更新 | 2026-08-05 |
+| 朝向 | yaml + `memory.py`（右=True 左=False） | ✅ |
+| scene_name | yaml + memory + session；链 `+0x01F28838` 多场景/重启已验 | ✅ |
+| game_state | 同链 `+0x18C`；4/5/3=PLAYING/PAUSED/CUTSCENE；进门偶发 6 几帧 | ✅ |
+| boss_hp | `GG_Hornet_1` 链 `+0x01F1FBC8`；`HealthManager+0x148`；重启 879/满血 900 验 | ✅ |
+| is_battle | 派生：`PLAYING`+场景在 `boss_info`+`boss_hp>0` | ✅ |
+| 更新 | 2026-08-06 |
 
 - [x] Phase 0～1.3 + B x/y+vision 冒烟
 - [x] BC.0 / BC.1 / BC.2 骨架（MLP+train+save；空 loader 会报错）
 - [x] 评审修复：hook 白名单 + `is_running` property；半局 `close`；load 缺 meta 跳过；None 帧 skip
 - [x] 朝向 CE：±1.0 扫描 → pointer scan → yaml `player_facing`；重启后与 x/y 同验通过
-- [ ] `memory.py` 读 `facing_right` 并写入采集
-- [ ] BC.2 真数据验收（B）→ BC.3 过拟合
-- [ ] CE N2 → 真 `is_battle` → `expert_v1` → BC.4 正式训
+- [x] 朝向 CE + memory 接线
+- [x] scene_name CE + yaml + memory + session（多场景/重启验）
+- [x] game_state Mono+同链验证（4/5/3）+ yaml + memory + session
+- [x] boss_hp（GG_Hornet_1）CE + yaml + memory + session；重启满血 900 验
+- [x] 真 `get_is_battle()`（非占位）
+- [ ] BC.2 真数据验收（B）→ BC.3 过拟合 → `expert_v1_*` 试采
 
 ---
 
@@ -106,9 +114,15 @@ is_battle = (game_state == PLAYING)
 | dataset | None skip；缺 meta/events 跳过；空 loader 保护 | ✅ |
 | `models/` gitignore | | ✅ |
 | CE 朝向 yaml | `player_facing` 静态链 B 验证 + 写入 | ✅ |
-| memory facing | 读 float → `PlayerStates.facing_right` | ☐ |
-| CE N2 余下 | scene / game_state / boss / 真 `is_battle` | ☐ **当前（B）** |
-| BC.3 / BC.4 | 过拟合 / 正式训 | ☐ 等数据与 CE |
+| memory facing | 读 float → `player_facing_right` | ✅ |
+| CE scene_name | pointer scan + 多场景/重启验证 | ✅ |
+| memory scene_name | `get_scene_name()` → `Observation.scene_name` | ✅ |
+| CE game_state | Mono `GameManager+0x18C`；与 scene 同静态链 | ✅ |
+| memory game_state | `get_game_state()` → `Observation.game_state` | ✅ |
+| CE boss_hp Hornet | pointer scan → 最短链 `0x1F1FBC8`；重启 rescan 验 | ✅ |
+| memory boss_hp | `get_boss_hp()` 按 `scene_name` 选链；换房清缓存 | ✅ |
+| 真 is_battle | `get_is_battle()` 派生 | ✅ |
+| BC.3 / BC.4 | 过拟合 / 正式训 | ☐ **当前（B）** |
 | 评审后置 | schema 强制校验、失焦过滤、train_bc 脚本、checkpoint 元信息等 | **不做（非主流程）** |
 
 **朝向链（2026-08-04，重启已验）**：
@@ -118,6 +132,34 @@ UnityPlayer.dll + 0x01F4F8B8
   → read_u64 → +0x0 → +0x3E8 → +0x0 → +0x28 → +0x60 → read_u64 → +0xB0 → read_float
 右 = -1.0，左 = +1.0（与常见 facingRight bool 相反，以实测为准）
 同局复验：x/y 链 +0x01F4FD90 仍有效（y≈60.658 神居平台）
+```
+
+**scene_name 链（2026-08-05，多场景+重启已验）**：
+
+```text
+UnityPlayer.dll + 0x01F28838（与 player_info 同根）
+  → read_u64 → +0x20 → +0x88 → +0x18 → +0x8 → +0x20 → read_u64 → +0x20（sceneName 指针槽）
+  → read_u64(slot) → string +0x10 length / +0x14 UTF-16
+已验：GG_Workshop、GG_Hornet_1、GG_False_Knight；Mono 字段 GameManager+0x20
+```
+
+**game_state（2026-08-05，与 scene_name 同链）**：
+
+```text
+UnityPlayer.dll + 0x01F28838（同 scene_name / player_info 根）
+  → 同 offsets → +0x18C → read_int（GameManager.gameState）
+枚举实测：4=PLAYING（能操控） 5=PAUSED  3=白屏/过场（CUTSCENE）
+无需单独 pointer scan；final_offset 0x18C vs scene 的 0x20
+```
+
+**boss_hp 链（2026-08-06，GG_Hornet_1，重启 879 + 满血 900 验）**：
+
+```text
+UnityPlayer.dll + 0x01F1FBC8
+  → read_u64 → +0x238 → +0x130 → +0x18 → +0x0 → +0x148 → read_int（HealthManager.hp）
+满血 900；仅 scene_name==GG_Hornet_1 时读取；勿跨 Boss 复用
+CE 指针库：`E:\缓存\tempdata\bosshp.sqlite` 已缩至 **1 条**（resultid=2602；备份 `bosshp.sqlite.bak` 含原 3059 条）
+若 yaml 链不稳定，用 CE 打开该 sqlite 或从 `.bak` 恢复后再筛
 ```
 
 ### B 机下一步（采数 / 验收 BC）
@@ -160,16 +202,15 @@ max_hp 验链失败连坐清缓存 —— 保留设计，不改
 
 ### 波 N2 — CE
 
-坐标 / 朝向 yaml 已齐。**待做**：`memory` 接 facing → scene / game_state / boss → 真 `is_battle`。  
-不用 `GameManager._instance`。
+**Hornet `boss_hp` + scene/game_state + facing 已齐；真 `is_battle` 已接。** 其它 Boss 另挖链。不用 `GameManager._instance`。
 
 ---
 
 ## 4. 仓库
 
 ```text
-configs/game_info.yaml          # player_info / player_position / player_facing
-scripts/{probe_*,collect_expert}.py
+configs/game_info.yaml          # player_* / scene / game_state / boss_info
+scripts/{probe_*,collect_expert}.py   # 不再新增临时验收脚本
 src/bossmind/{config,paths,utils}.py   # MODEL_DIR = models/
 src/bossmind/data/{schema,writer}.py
 src/bossmind/env_tools/{memory,input,session,keyboard_hook,vision}.py
@@ -185,6 +226,9 @@ results/phase0.md
 
 | 日期 | 事件 |
 |------|------|
+| 2026-08-06 | **boss_hp GG_Hornet_1 定稿** + 真 `is_battle`；重启 879/满血 900；`bosshp.sqlite` 缩至 1 链 |
+| 2026-08-05 | **game_state 定稿**：与 scene 同链 `+0x18C`；4/5/3 映射；memory+session |
+| 2026-08-05 | **scene_name 定稿**：yaml 静态链 + `memory.get_scene_name` + session；多场景/重启 PASS |
 | 2026-08-05 | **`main` ← `Phase-BC` 合并**：BC 骨架 + hook/dataset/collect 评审修复 |
 | 2026-08-05 | BC 骨架：policy train/save；None 帧 skip；`models/` gitignore；等 B 真数据 |
 | 2026-08-04 | **朝向静态链定稿**：yaml `player_facing`；重启后与 x/y 同验 PASS |

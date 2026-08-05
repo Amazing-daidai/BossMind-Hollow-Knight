@@ -23,8 +23,28 @@ player_facing:
   value_type: float
   right_value: -1.0
   left_value: 1.0
+scene_name:
+  module_base: UnityPlayer.dll
+  base_offset: 0x01F28838
+  offsets: [0x20, 0x88, 0x18, 0x8, 0x20]
+  name_ptr_offset: 0x20
+  string_length_offset: 0x10
+  string_chars_offset: 0x14
+game_state:
+  module_base: UnityPlayer.dll
+  base_offset: 0x01F28838
+  offsets: [0x20, 0x88, 0x18, 0x8, 0x20]
+  state_offset: 0x18C
+  playing_value: 4
+  paused_value: 5
+  cutscene_value: 3
 boss_info:
   GG_Hornet_1:
+    module_base: UnityPlayer.dll
+    base_offset: 0x01F1FBC8
+    offsets: [0x238, 0x130, 0x18, 0x0]
+    hp_offset: 0x148
+    max_hp: 900
 keybinds:
   left: a
   right: d

@@ -93,8 +93,17 @@ class GameSession:
         else:
             self._hp_fail_streak += 1
             player_states.player_hp = self._last_hp   # 用上一帧填充，可能失真，后续改。
-        boss_states = BossStates()
-        observation = Observation(player=player_states, boss=boss_states, is_battle=self.get_is_battle(), window_focused=window_focused, read_error_streak=self._hp_fail_streak)
+        boss_states = BossStates(boss_hp=self._player_info.get_boss_hp())
+        # scene_name / game_state / is_battle 来自 memory 派生；is_battle 需 PLAYING 且 boss_hp>0
+        observation = Observation(
+            player=player_states,
+            boss=boss_states,
+            is_battle=self.get_is_battle(),
+            window_focused=window_focused,
+            scene_name=self._player_info.get_scene_name(),
+            game_state=self._player_info.get_game_state(),
+            read_error_streak=self._hp_fail_streak,
+        )
         return observation
 
 if __name__ == "__main__":
