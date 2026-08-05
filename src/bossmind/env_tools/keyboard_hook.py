@@ -45,7 +45,6 @@ class KeyboardHook:
         }
         self._listener = None
         self._lock = threading.Lock()
-        self.is_running = False
         self.is_ok = False
 
     # 工具函数
@@ -98,6 +97,9 @@ class KeyboardHook:
         # 如果逻辑键为空, 则返回
         if logic_key is None:
             return
+        # 如果逻辑键不在_state中，则返回
+        if logic_key not in self._state:
+            return
         # 更新状态
         with self._lock:
             if not self._state[logic_key]:      # 刚才是松开的
@@ -112,6 +114,9 @@ class KeyboardHook:
         logic_key = self._token_to_logic_key(token)
         if logic_key is None:
             return
+        # 如果逻辑键不在_state中，则返回
+        if logic_key not in self._state:
+            return
         with self._lock:
             self._state[logic_key] = False
 
@@ -123,6 +128,11 @@ class KeyboardHook:
             on_press=self._on_press, on_release=self._on_release
         )
 
+    # 判断是否在运行
+    @property
+    def is_running(self) -> bool:
+        return self._listener is not None and self._listener.running
+
     # 业务函数
     def start(self):
         if self.is_running:
@@ -130,7 +140,6 @@ class KeyboardHook:
         self._get_listener()
         self._listener.daemon = True
         self._listener.start()
-        self.is_running = True
 
     def stop(self):
         """
@@ -146,7 +155,6 @@ class KeyboardHook:
                 for k in self._edge:
                     self._edge[k] = False
             self._listener = None
-            self.is_running = False
             self.is_ok = False
     
     def snapshot(self):

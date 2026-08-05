@@ -272,6 +272,13 @@ class CollectExpert:
             self._end_collect()
 
     def _end_collect(self):
+        # 防止在pre_write后，主循环try之前就结束
+        if self._writer is not None:
+            try:
+                if not self._writer._closed:   
+                    self._writer.close(self._end_reason, n_dropped=0)
+            except Exception:
+                print("写盘器关闭失败")
         self._writer = None
         self._keyboard_hook.stop()
         self._session.detach()
