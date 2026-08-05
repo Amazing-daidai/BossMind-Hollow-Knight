@@ -28,28 +28,29 @@
 | Boss 字段 | 短期 CE/Mono；挖不通则批次标 `pipeline_only`，不进训练集 |
 | 采样率 | 正式批次 **60Hz** 事件；视觉旁路 **10Hz** 固定战斗 ROI |
 | Boss 标识 | meta.`boss` 为 `str`，取值建议场景名如 `GG_Hornet_1` |
-| 动作标签 | 键盘钩子：`held` + `pressed` 边沿；逻辑键含 **tab**（12 维） |
-| hp 语义 | `session` 读失败时用上一帧填充；**真失败看 `read_error_streak>0`**，训前过滤 |
-| 图像 | **硬需求**：截图/写盘失败 → `end_reason=error`；队列丢帧超限 → `discard` |
+| 动作标签 | 键盘钩子：`held` + `pressed` 边沿；逻辑键含 **tab**（12 维）；`inventory`/`esc` 可在 yaml 但不进 `_state` |
+| hp 语义 | `session` 读失败时用上一帧填充；**真失败看 `read_error_streak>0`** |
+| 图像 | **硬需求**：截图/写盘失败 → `error`；队列丢帧超限 → `discard` |
+| max_hp 验链 | 与配置比对校验指针链；失败可清空全部地址缓存（刻意连坐）后重解析 |
 
 ### Schema 版本规则
 
 | 变更 | 版本 | 老数据 |
 |------|------|--------|
-| 加可空字段 | minor（1.0→1.1） | 可混训（补 None） |
-| 改名 / 改语义 / 改必填 | **major**（1→2） | **禁止混训** |
+| 加可空字段 | minor | 可混训（补 None） |
+| 改名 / 改语义 / 改必填 | **major** | **禁止混训** |
 
-当前工作树 `SCHEMA_VERSION = 1.1.1`：vision provenance 保留；新增 `tab`；`PlayerStates`/`BossStates` 字段改为 `player_hp` / `player_x` 等前缀名（**与 20260803 旧 smoke 的 `hp/x/y` 不兼容**，BC 用新采或 `pipeline_fake`）。
+当前 `SCHEMA_VERSION = 1.1.1`：`tab`；`player_*` / `boss_*` 前缀名（**与 20260803 旧 smoke 的 `hp/x/y` 不兼容**）。loader **尚未**强制校验 version（刻意后置）。
 
 ### `is_battle` 语义（派生，原料必须落盘）
 
 ```text
 is_battle = (game_state == PLAYING)
          AND (scene_name in 允许的 Boss 场景)
-         AND (boss.hp is not None AND boss.hp > 0)   # 落盘字段名以 schema 为准（现为 boss_hp）
+         AND (boss_hp is not None AND boss_hp > 0)
 ```
 
-当前 `memory.get_is_battle` 仍为占位恒 `True` → **不会产生可靠 `end_reason=win`**；在 CE 接好之前只允许 `smoke_*` / `pipeline_*`，**禁止** `expert_v1_*`。
+`get_is_battle` 仍占位恒 `True` → 无可靠 `win`；仅 `smoke_*` / `pipeline_*`，**禁止** `expert_v1_*`。
 
 ### 协作铁律（Agent 必读）
 
@@ -57,41 +58,37 @@ is_battle = (game_state == PLAYING)
 |------|------|
 | **师父模式** | 用户自行实现；Agent：讲思路、给步骤、审代码、排错 |
 | **禁止代写** | 除非用户明确要求「请代写 xxx」 |
-| **推进节奏** | **双线**：CE N2（scene/game_state/boss）∥ L3 BC stub（BC.2→过拟合）；正式 `train_bc` / `expert_v1` 仍门禁 |
+| **推进节奏** | **双线**：B 采数/CE N2 ∥ A BC 真数据验收→过拟合；正式 `train_bc`/`expert_v1` 门禁 |
 
-**双设备**：A=`D:\BossMind`（可 CPU PyTorch 写/测 BC）；B=`E:\BossMind`（HK/采数/CE）；conda `BossMind` 3.12.13。  
-正式大训仍预定 **WSL + ROCm**（见 `requirements.txt` 头注释）；A 机 CPU torch **仅临时开发**。
+**双设备**：A=`D:\BossMind`（CPU PyTorch 写/测 BC）；B=`E:\BossMind`（HK/采数/CE）；conda `BossMind` 3.12.13。  
+正式大训预定 **WSL + ROCm**；A 机 CPU torch 仅开发。
 
 ---
 
-## 2. 当前状态（2026-08-04）
+## 2. 当前状态（2026-08-05）
 
 | 字段 | 值 |
 |------|-----|
-| 阶段 | **双线：CE N2 进行中 ∥ L3 BC.0–1 已完成，下一课 BC.2** |
-| 子课 A | BC.2：`PolicyMLP` + BCEWithLogits；假数据/`load_episode` 能 backward |
-| 子课 B | CE N2：scene / game_state / boss → 真 `is_battle` |
-| Git | `origin/main` @ `3dba95b`；**本地未提交**：`learning/`、schema/tab、deps 等 |
+| 阶段 | **BC 训练骨架已齐；朝向 yaml 已定；等 B 真数据验收 ∥ CE N2** |
+| 子课 A | B 机/新 schema 数据跑通 `BCPolicy.train` → BC.3 单局过拟合 |
+| 子课 B | CE：scene / game_state / boss → 真 `is_battle` |
+| Git | **`main` ← `Phase-BC` 已合并** |
 | 采集判定 | **GO** `smoke_*` / `pipeline_*`；**NO** `expert_v1_*` |
 | B 机 x/y+vision smoke | 三局 `20260803_*` 已通过（字段名为旧 `hp/x/y`） |
+| L3 BC | `learning/{actions,dataset,policy}.py`：FrameDataset、DataLoader、BCEWithLogits、存 `MODEL_DIR/bc_model.pth` |
+| BC 样本 | `(x,a)`；`held` 12 维；**含 `None` 的 obs 帧 skip**；`load_batch` 仅 `end_reason==win` |
+| 特征表 | 仍含 facing/boss 等 → CE 未接前真数据可能大量 skip；训前可临时收窄 `PLAY_INFO`/`BOSS_INFO` |
 | 视觉 | ROI `190,230,1550×740`；`capture_ms_p95` 6.8–8.9ms → **暂不异步截图** |
-| L3 BC | `src/bossmind/learning/`：`actions.py`（BC.0）+ `dataset.py`（BC.1） |
-| BC 标签 | `held`→12 维（含 tab）；样本 `(x, a)`；第一版只用 held |
-| BC 过滤 | `load_batch` 仅 `end_reason==win`（真数据暂少）；通路/过拟合用 **`load_episode`** |
-| PyTorch（A） | 计划/可装 **CPU Stable**：`pip install torch --index-url https://download.pytorch.org/whl/cpu` |
-| 依赖 | `jsonlines>=4.0,<5` 已写入 `requirements.txt` / `pyproject.toml` `[data]` |
-| 朝向 | yaml **`player_facing` 已写入**（`+0x01F4F8B8` 静态链；右=-1 左=+1 float）；**待** `memory.py` 接线 |
-| 更新 | 2026-08-04 |
+| 朝向 | yaml **`player_facing` 已写入**（`+0x01F4F8B8`；右=-1 左=+1 float）；**待** `memory.py` 接线 |
+| 更新 | 2026-08-05 |
 
-- [x] Phase 0～1.3：探针 / 采集 / vision / x/y 联合冒烟（见既有里程碑）
-- [x] BC.0：`ACTION_KEY` + `key_to_vec` / `obs_to_vec`（含 tab；obs 可含 None/bool，进张量前再收）
-- [x] BC.1：`load_episode` + `load_batch`（假局 `pipeline_fake` 验证）
-- [ ] BC.2：PolicyMLP + BCEWithLogits + backward
-- [ ] BC.3：单局过拟合
-- [x] 朝向 CE：浮点扫描 ±1.0 → pointer scan → yaml `player_facing`；重启后与 x/y 同验通过
+- [x] Phase 0～1.3 + B x/y+vision 冒烟
+- [x] BC.0 / BC.1 / BC.2 骨架（MLP+train+save；空 loader 会报错）
+- [x] 评审修复：hook 白名单 + `is_running` property；半局 `close`；load 缺 meta 跳过；None 帧 skip
+- [x] 朝向 CE：±1.0 扫描 → pointer scan → yaml `player_facing`；重启后与 x/y 同验通过
 - [ ] `memory.py` 读 `facing_right` 并写入采集
-- [ ] CE N2 余下：scene / game_state / boss / 真 `is_battle`
-- [ ] BC.4 / 正式 `train_bc`：等 CE + `expert_v1` 门禁
+- [ ] BC.2 真数据验收（B）→ BC.3 过拟合
+- [ ] CE N2 → 真 `is_battle` → `expert_v1` → BC.4 正式训
 
 ---
 
@@ -101,17 +98,18 @@ is_battle = (game_state == PLAYING)
 
 | ID | 任务 | 状态 |
 |----|------|------|
-| … | Phase 0～1.3 / B smoke / vision 审阅（既有） | ✅ |
-| schema 1.1.1 | `tab`；`player_*` / `boss_*` 字段前缀；探针/collect 已跟名 | 本地 ✅ 待 commit |
-| BC.0 | `learning/actions.py` | ✅ |
-| BC.1 | `learning/dataset.py`（`(x,a)`；`jsonlines`） | ✅ |
-| deps | `jsonlines`；A 机 CPU torch（用户装） | ✅ / 进行中 |
-| BC.2 | `learning/policy.py` MLP | ☐ **当前（A）** |
-| CE 朝向 yaml | `player_facing` 静态链 B 验证 + 写入 `game_info.yaml` | ✅ |
+| Phase 0～1.3 / smoke | 既有 | ✅ |
+| schema 1.1.1 | `tab`；`player_*` / `boss_*` 前缀 | ✅ |
+| BC.0–2 骨架 | actions / dataset / policy | ✅（待真数据验收） |
+| Hook | `logic_key in _state`；`@property is_running` | ✅ |
+| collect `_end_collect` | 未 close 则 `close`；防 pre_write 后泄漏 | ✅ |
+| dataset | None skip；缺 meta/events 跳过；空 loader 保护 | ✅ |
+| `models/` gitignore | | ✅ |
+| CE 朝向 yaml | `player_facing` 静态链 B 验证 + 写入 | ✅ |
 | memory facing | 读 float → `PlayerStates.facing_right` | ☐ |
 | CE N2 余下 | scene / game_state / boss / 真 `is_battle` | ☐ **当前（B）** |
-| 异步截图 / F1-2/3 | backlog | — |
-| 正式 `train_bc` / `expert_v1` | **冻结**至 CE 门禁 | 冻 |
+| BC.3 / BC.4 | 过拟合 / 正式训 | ☐ 等数据与 CE |
+| 评审后置 | schema 强制校验、失焦过滤、train_bc 脚本、checkpoint 元信息等 | **不做（非主流程）** |
 
 **朝向链（2026-08-04，重启已验）**：
 
@@ -122,14 +120,14 @@ UnityPlayer.dll + 0x01F4F8B8
 同局复验：x/y 链 +0x01F4FD90 仍有效（y≈60.658 神居平台）
 ```
 
-### B 机采集冒烟（2026-08-03 已通过）
+### B 机下一步（采数 / 验收 BC）
 
 ```text
-1. git pull && pip install -e .
-2. window_title / vision_region
-3. probe_attach → probe_hp → probe_keyboard → probe_loop
-4. collect_expert smoke_* ；查 meta + frames
-闸门：capture_ms_p95 < 10ms → 暂不异步截图
+1. git pull；pip install -e .；CPU/适用 torch
+2. 用新 schema 采 smoke/pipeline（注意 win 过滤与特征 None→大量 skip）
+3. 调用 BCPolicy.train(batch_name)；确认 loss 与 models/bc_model.pth
+4. 可选：单局过拟合（BC.3）
+闸门：hook 按 i 不脏标签；半局有 meta；空样本立刻报错
 ```
 
 **B 机 x/y+vision 冒烟（2026-08-03）** — `smoke_1/20260803_{221846,222026,222253}`：
@@ -142,22 +140,22 @@ UnityPlayer.dll + 0x01F4F8B8
 
 **分析注意**：判受伤看 HP 当帧 + 延迟 y；判超冲看长按 `super_dash` + 松手后 x；`pressed.jump`≠起跳。
 
-### L3 BC stub 步骤（A 机）
+### L3 BC 步骤
 
 ```text
-BC.0 ✅ 键序+向量   BC.1 ✅ 读局   BC.2 ☐ MLP+backward
-BC.3 ☐ 单局过拟合   BC.4 ☐ 过滤+正式训（等 CE）
-过拟合/通路：load_episode(路径)；勿依赖 load_batch 的 win 过滤
-进 tensor 前：None→0.0，bool→0/1 float；BCEWithLogits（logits 勿先 sigmoid）
+BC.0 ✅  BC.1 ✅  BC.2 骨架 ✅ / 真数据验收 ☐
+BC.3 ☐ 过拟合   BC.4 ☐ 正式训（等 CE + expert_v1）
+标签：held；含 None 的帧 skip；bool 可进 tensor
+日志：默认无 basicConfig 时 logger.info 不显示 → 入口配 INFO 或用 print
 ```
 
-### 明确不做（仍冻结）
+### 明确不做 / 后置
 
 ```text
-启发式假 is_battle / expert_v1_* / 正式 train_bc
-PointerChain / Config 大重构 / 完整 tests+CI
-为「优雅」改记拍；未紧张不上异步截图 / DXGI
-A 机不装 CUDA/ROCm 版 PyTorch（临时 CPU 即可）
+正式 train_bc 工程化、checkpoint 契约、schema loader 校验、失焦帧过滤
+启发式 is_battle / expert_v1_* / 在线 RL / CNN 主输入 / LLM（Phase 1）
+异步截图；为「优雅」改记拍
+max_hp 验链失败连坐清缓存 —— 保留设计，不改
 ```
 
 ### 波 N2 — CE
@@ -172,11 +170,11 @@ A 机不装 CUDA/ROCm 版 PyTorch（临时 CPU 即可）
 ```text
 configs/game_info.yaml          # player_info / player_position / player_facing
 scripts/{probe_*,collect_expert}.py
-src/bossmind/{config,paths,utils}.py
-src/bossmind/data/{schema,writer}.py          # 1.1.1；ImageWriter
+src/bossmind/{config,paths,utils}.py   # MODEL_DIR = models/
+src/bossmind/data/{schema,writer}.py
 src/bossmind/env_tools/{memory,input,session,keyboard_hook,vision}.py
-src/bossmind/learning/{actions,dataset}.py    # L3 BC stub；policy 待写
-src/bossmind/env_tools/reset_backends/{menu,mod}.py
+src/bossmind/learning/{actions,dataset,policy}.py
+models/                                 # gitignore；权重本地
 tests/{test_vision,test_episode_writer_images}.py
 results/phase0.md
 ```
@@ -187,11 +185,11 @@ results/phase0.md
 
 | 日期 | 事件 |
 |------|------|
-| 2026-08-04 | **朝向静态链定稿**：CE ±1.0 扫描 → `朝向结果.sqlite` 354 链 → yaml `player_facing`；重启后与 x/y 同验 PASS |
-| 2026-08-04 | **L3 BC 开工**：BC.0/1（`learning/actions|dataset`）；tab→12 维；schema 1.1.1 字段前缀；`jsonlines`；下一步 BC.2；CE N2 并行 |
-| 2026-08-03 | **B x/y+vision 冒烟通过**：三局 `20260803_*`；坐标+按键+受击/超冲模式核对 |
-| 2026-08-03 | 坐标链 + `memory` x/y；冒烟合入 `3dba95b`；vision 合入 `89c3a7a` |
+| 2026-08-05 | **`main` ← `Phase-BC` 合并**：BC 骨架 + hook/dataset/collect 评审修复 |
+| 2026-08-05 | BC 骨架：policy train/save；None 帧 skip；`models/` gitignore；等 B 真数据 |
+| 2026-08-04 | **朝向静态链定稿**：yaml `player_facing`；重启后与 x/y 同验 PASS |
+| 2026-08-04 | L3 BC 开工：BC.0/1；tab；schema 1.1.1 前缀名；jsonlines |
+| 2026-08-03 | B x/y+vision 冒烟；坐标接线；vision 合入 |
 | 2026-08-01 | B 事件 smoke；Phase 1.2；soul `+0x1D4` |
 | 2026-07-31 | 观测源/schema/`is_battle` 定稿 |
-| 2026-07-30 | 协作铁律；Phase 1 启动 |
 | 2026-07-29 | Phase 0 收官 10/10 |
