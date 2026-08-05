@@ -80,7 +80,7 @@ is_battle = (game_state == PLAYING)
 | BC 过滤 | `load_batch` 仅 `end_reason==win`（真数据暂少）；通路/过拟合用 **`load_episode`** |
 | PyTorch（A） | 计划/可装 **CPU Stable**：`pip install torch --index-url https://download.pytorch.org/whl/cpu` |
 | 依赖 | `jsonlines>=4.0,<5` 已写入 `requirements.txt` / `pyproject.toml` `[data]` |
-| 朝向 | 未接；低优先级 |
+| 朝向 | yaml **`player_facing` 已写入**（`+0x01F4F8B8` 静态链；右=-1 左=+1 float）；**待** `memory.py` 接线 |
 | 更新 | 2026-08-04 |
 
 - [x] Phase 0～1.3：探针 / 采集 / vision / x/y 联合冒烟（见既有里程碑）
@@ -88,6 +88,8 @@ is_battle = (game_state == PLAYING)
 - [x] BC.1：`load_episode` + `load_batch`（假局 `pipeline_fake` 验证）
 - [ ] BC.2：PolicyMLP + BCEWithLogits + backward
 - [ ] BC.3：单局过拟合
+- [x] 朝向 CE：浮点扫描 ±1.0 → pointer scan → yaml `player_facing`；重启后与 x/y 同验通过
+- [ ] `memory.py` 读 `facing_right` 并写入采集
 - [ ] CE N2 余下：scene / game_state / boss / 真 `is_battle`
 - [ ] BC.4 / 正式 `train_bc`：等 CE + `expert_v1` 门禁
 
@@ -105,9 +107,20 @@ is_battle = (game_state == PLAYING)
 | BC.1 | `learning/dataset.py`（`(x,a)`；`jsonlines`） | ✅ |
 | deps | `jsonlines`；A 机 CPU torch（用户装） | ✅ / 进行中 |
 | BC.2 | `learning/policy.py` MLP | ☐ **当前（A）** |
-| CE N2 | scene / game_state / boss / 真 `is_battle` | ☐ **当前（B）** |
-| 朝向 / 异步截图 / F1-2/3 | backlog | — |
+| CE 朝向 yaml | `player_facing` 静态链 B 验证 + 写入 `game_info.yaml` | ✅ |
+| memory facing | 读 float → `PlayerStates.facing_right` | ☐ |
+| CE N2 余下 | scene / game_state / boss / 真 `is_battle` | ☐ **当前（B）** |
+| 异步截图 / F1-2/3 | backlog | — |
 | 正式 `train_bc` / `expert_v1` | **冻结**至 CE 门禁 | 冻 |
+
+**朝向链（2026-08-04，重启已验）**：
+
+```text
+UnityPlayer.dll + 0x01F4F8B8
+  → read_u64 → +0x0 → +0x3E8 → +0x0 → +0x28 → +0x60 → read_u64 → +0xB0 → read_float
+右 = -1.0，左 = +1.0（与常见 facingRight bool 相反，以实测为准）
+同局复验：x/y 链 +0x01F4FD90 仍有效（y≈60.658 神居平台）
+```
 
 ### B 机采集冒烟（2026-08-03 已通过）
 
@@ -149,15 +162,15 @@ A 机不装 CUDA/ROCm 版 PyTorch（临时 CPU 即可）
 
 ### 波 N2 — CE
 
-坐标已采。**待做**：scene / game_state / boss → 真 `is_battle` → `expert_v1_*`。  
-不用 `GameManager._instance`；朝向可后补。
+坐标 / 朝向 yaml 已齐。**待做**：`memory` 接 facing → scene / game_state / boss → 真 `is_battle`。  
+不用 `GameManager._instance`。
 
 ---
 
 ## 4. 仓库
 
 ```text
-configs/game_info.yaml
+configs/game_info.yaml          # player_info / player_position / player_facing
 scripts/{probe_*,collect_expert}.py
 src/bossmind/{config,paths,utils}.py
 src/bossmind/data/{schema,writer}.py          # 1.1.1；ImageWriter
@@ -174,6 +187,7 @@ results/phase0.md
 
 | 日期 | 事件 |
 |------|------|
+| 2026-08-04 | **朝向静态链定稿**：CE ±1.0 扫描 → `朝向结果.sqlite` 354 链 → yaml `player_facing`；重启后与 x/y 同验 PASS |
 | 2026-08-04 | **L3 BC 开工**：BC.0/1（`learning/actions|dataset`）；tab→12 维；schema 1.1.1 字段前缀；`jsonlines`；下一步 BC.2；CE N2 并行 |
 | 2026-08-03 | **B x/y+vision 冒烟通过**：三局 `20260803_*`；坐标+按键+受击/超冲模式核对 |
 | 2026-08-03 | 坐标链 + `memory` x/y；冒烟合入 `3dba95b`；vision 合入 `89c3a7a` |

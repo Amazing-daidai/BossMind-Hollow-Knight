@@ -11,6 +11,7 @@ class Config(BaseModel):
     window_title: str
     player_info: dict
     player_position: dict
+    player_facing: dict
     boss_info: dict
     keybinds: dict
     menu: dict

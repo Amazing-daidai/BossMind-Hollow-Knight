@@ -15,6 +15,14 @@ player_position:
   offsets: [0x48, 0x370, 0x10]
   x_offset: 0x22C
   y_offset: 0x230
+player_facing:
+  module_base: UnityPlayer.dll
+  base_offset: 0x01F4F8B8
+  offsets: [0x0, 0x3E8, 0x0, 0x28, 0x60]
+  facing_offset: 0xB0
+  value_type: float
+  right_value: -1.0
+  left_value: 1.0
 boss_info:
   GG_Hornet_1:
 keybinds:
