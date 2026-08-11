@@ -18,6 +18,7 @@ class Config(BaseModel):
     keybinds: dict
     menu: dict
     collect: dict
+    client: dict
 
 @lru_cache(maxsize=1)
 def load_config():

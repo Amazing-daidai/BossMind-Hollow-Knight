@@ -220,3 +220,10 @@ data/processed/
 artifacts/
 models/
 !tests/fixtures/
+
+# Hollow Knight Mod (C#)
+mods/**/bin/
+mods/**/obj/
+mods/**/HollowKnightRefs.props
+*.user
+*.suo

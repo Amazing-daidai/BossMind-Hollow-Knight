@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <AssemblyName>BossMind.Mod</AssemblyName>
+    <RootNamespace>BossMind.Mod</RootNamespace>
+    <Version>0.1.0.0</Version>
+    <LangVersion>latest</LangVersion>
+    <Deterministic>true</Deterministic>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <OutputPath>bin\$(Configuration)\</OutputPath>
+  </PropertyGroup>
+
+  <!-- 本机路径：复制 HollowKnightRefs.props.example → HollowKnightRefs.props -->
+  <Import Project="HollowKnightRefs.props" Condition="Exists('HollowKnightRefs.props')" />
+
+  <PropertyGroup>
+    <HollowKnightRefs Condition="'$(HollowKnightRefs)' == ''">$(MSBuildProgramFiles32)\Steam\steamapps\common\Hollow Knight\hollow_knight_Data\Managed</HollowKnightRefs>
+    <HollowKnightMods Condition="'$(HollowKnightMods)' == ''">$(HollowKnightRefs)\..\..\Mods\BossMind.Mod</HollowKnightMods>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(HollowKnightRefs)\Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(HollowKnightRefs)\UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.SharedInternalsModule">
+      <HintPath>$(HollowKnightRefs)\UnityEngine.SharedInternalsModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- 编译成功后复制到游戏 Mods 目录（游戏勿在运行中） -->
+  <Target Name="CopyToMods" AfterTargets="Build" Condition="Exists('$(HollowKnightRefs)\Assembly-CSharp.dll')">
+    <MakeDir Directories="$(HollowKnightMods)" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(HollowKnightMods)" SkipUnchangedFiles="true" />
+    <Message Importance="high" Text="Copied $(TargetFileName) → $(HollowKnightMods)" />
+  </Target>
+</Project>

@@ -93,3 +93,6 @@ collect:
   vision_format: jpg          # jpg | png
   vision_jpeg_quality: 85
   max_image_dropped: 3        # 队列丢帧累计上限 → discard；正式批次可改为 0
+client:
+  UdpHost: 127.0.0.1
+  UdpPort: 28765

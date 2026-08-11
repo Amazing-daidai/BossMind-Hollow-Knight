@@ -1,0 +1,12 @@
+<!--
+  复制本文件为同目录下的 HollowKnightRefs.props，再改成你 B 机上的真实路径。
+  HollowKnightRefs.props 已被 gitignore，不要提交本机路径。
+-->
+<Project>
+  <PropertyGroup>
+    <!-- 指向 hollow_knight_Data\Managed（内含 Assembly-CSharp.dll） -->
+    <HollowKnightRefs>C:\Program Files (x86)\Steam\steamapps\common\Hollow Knight\hollow_knight_Data\Managed</HollowKnightRefs>
+    <!-- 编译后复制 DLL 的目标；一般是游戏根目录下 Mods\BossMind.Mod -->
+    <HollowKnightMods>C:\Program Files (x86)\Steam\steamapps\common\Hollow Knight\Mods\BossMind.Mod</HollowKnightMods>
+  </PropertyGroup>
+</Project>
