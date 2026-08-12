@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field, ValidationError
 from typing import Literal
 
-SCHEMA_VERSION = "1.1.1"
+SCHEMA_VERSION = "2.0.0"
 
 # 按键数据
 class ButtonStates(BaseModel):
@@ -28,27 +28,25 @@ class PlayerStates(BaseModel):
     player_x: float | None = None
     player_y: float | None = None
     soul: int | None = None
-    max_hp: int | None = None
     player_facing_right: bool | None = None
-    player_on_ground: bool | None = None
 
-# boss状态
-class BossStates(BaseModel):
-    boss_hp: int | None = None
-    boss_x: float | None = None
-    boss_y: float | None = None
-    boss_facing_right: bool | None = None
-    boss_on_ground: bool | None = None
+# 敌人状态
+class EnemyStates(BaseModel):
+    enemy_hp: int | None = None
+    enemy_x: float | None = None
+    enemy_y: float | None = None
+    enemy_facing_right: bool | None = None
+    name: str | None = None
 
 # 游戏数据
 class Observation(BaseModel):
     player: PlayerStates
-    boss: BossStates
+    enemies: list[EnemyStates]
+    n_enemies: int | None = None
     window_focused: bool | None = None
     is_battle: bool | None = None
     scene_name: str | None = None
     game_state: str | None = None
-    read_error_streak: int = Field(default=0)
 
 # 整体记录内容
 class EventRecord(BaseModel):
@@ -85,7 +83,6 @@ class MetaData(BaseModel):
     boss: str
     n_events: int = Field(...)
     n_frames: int = Field(...)
-    # vision provenance（1.1.0 minor，可空）
     vision_hz: float | None = None  # 图像采样率
     vision_region: dict | None = None
     vision_format: str | None = None  # 图像采集格式

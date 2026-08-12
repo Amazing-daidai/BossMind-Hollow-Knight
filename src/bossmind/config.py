@@ -7,14 +7,9 @@ from functools import lru_cache
 from pydantic import BaseModel, ValidationError
 
 class Config(BaseModel):
-    process_name: str
     window_title: str
-    player_info: dict
-    player_position: dict
     player_facing: dict
-    scene_name: dict
     game_state: dict
-    boss_info: dict
     keybinds: dict
     menu: dict
     collect: dict

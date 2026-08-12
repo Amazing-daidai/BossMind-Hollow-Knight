@@ -1,50 +1,12 @@
-process_name: hollow_knight.exe
 window_title: Hollow Knight
-player_info:
-  module_base: UnityPlayer.dll
-  base_offset: 0x01F28838
-  offsets: [0x0, 0x0, 0x10, 0x18, 0x0, 0x60]
-  hp_offset: 0x198
-  max_hp_offset: 0x19C
-  soul_offset: 0x1D4
-  max_hp: 9 # 神居档的最大血量为9，目前本项目只考虑神居。提前设置好最大血量，用于检验通过内存读取到的最大血量是否正确
-  hp_value_type: 当前仅int32，无需调整。
-player_position:
-  module_base: UnityPlayer.dll
-  base_offset: 0x01F4FD90
-  offsets: [0x48, 0x370, 0x10]
-  x_offset: 0x22C
-  y_offset: 0x230
+
 player_facing:
-  module_base: UnityPlayer.dll
-  base_offset: 0x01F4F8B8
-  offsets: [0x0, 0x3E8, 0x0, 0x28, 0x60]
-  facing_offset: 0xB0
-  value_type: float
   right_value: -1.0
   left_value: 1.0
-scene_name:
-  module_base: UnityPlayer.dll
-  base_offset: 0x01F28838
-  offsets: [0x20, 0x88, 0x18, 0x8, 0x20]
-  name_ptr_offset: 0x20
-  string_length_offset: 0x10
-  string_chars_offset: 0x14
 game_state:
-  module_base: UnityPlayer.dll
-  base_offset: 0x01F28838
-  offsets: [0x20, 0x88, 0x18, 0x8, 0x20]
-  state_offset: 0x18C
   playing_value: 4
   paused_value: 5
   cutscene_value: 3
-boss_info:
-  GG_Hornet_1:
-    module_base: UnityPlayer.dll
-    base_offset: 0x01F1FBC8
-    offsets: [0x238, 0x130, 0x18, 0x0]
-    hp_offset: 0x148
-    max_hp: 900
 keybinds:
   left: a
   right: d
