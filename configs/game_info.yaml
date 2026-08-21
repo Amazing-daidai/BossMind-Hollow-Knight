@@ -1,5 +1,5 @@
 window_title: Hollow Knight
-
+process_name: hollow_knight.exe
 player_facing:
   right_value: -1.0
   left_value: 1.0
@@ -47,7 +47,6 @@ collect:
   countdown_s: 5
   boss: GG_Hornet_1
   max_episode_s: 300          # 单局最长秒数 → end_reason=timeout
-  max_hp_read_fail: 30        # 连续 hp 读失败帧数上限 → discard
   max_focus_lost: 120         # 连续失焦帧数上限 → discard
   max_dropped: 100            # 追帧累计丢帧上限 → discard
   vision_hz: 10
@@ -58,3 +57,49 @@ collect:
 client:
   UdpHost: 127.0.0.1
   UdpPort: 28765
+
+# 神居第一门 Pantheon of the Master（战斗房 only；不含 GG_Spa / 中场）
+# is_battle: PLAYING ∧ scene∈本表 ∧ enemies.name 命中任一 primary_name_substr 且该主敌 hp>0
+# 双人战（钉大师）多个子串：命中任一即视为主敌，多个则取 hp 最大
+# primary_name_substr 按常见 GameObject 名；B 机 Log 对不上再改子串
+boss_info:
+  GG_Vengefly:
+    pantheon: 1
+    display_name: Vengefly King
+    primary_name_substr: ["Vengefly", "Buzzer"]
+  GG_Gruz_Mother:
+    pantheon: 1
+    display_name: Gruz Mother
+    primary_name_substr: ["Gruz", "Giant Fly"]
+  GG_False_Knight:
+    pantheon: 1
+    display_name: False Knight
+    primary_name_substr: ["False Knight"]
+  GG_Mega_Moss_Charger:
+    pantheon: 1
+    display_name: Massive Moss Charger
+    primary_name_substr: ["Moss Charger", "Mega Moss"]
+  GG_Hornet_1:
+    pantheon: 1
+    display_name: Hornet Protector
+    primary_name_substr: ["Hornet"]
+  GG_Ghost_Gorb:
+    pantheon: 1
+    display_name: Gorb
+    primary_name_substr: ["Gorb", "Aladar"]
+  GG_Dung_Defender:
+    pantheon: 1
+    display_name: Dung Defender
+    primary_name_substr: ["Dung Defender"]
+  GG_Mage_Knight:
+    pantheon: 1
+    display_name: Soul Warrior
+    primary_name_substr: ["Mage Knight"]
+  GG_Brooding_Mawlek:
+    pantheon: 1
+    display_name: Brooding Mawlek
+    primary_name_substr: ["Mawlek"]
+  GG_Nailmasters:
+    pantheon: 1
+    display_name: Brothers Oro & Mato
+    primary_name_substr: ["Oro", "Mato"]

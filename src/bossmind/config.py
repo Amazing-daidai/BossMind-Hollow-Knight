@@ -8,12 +8,14 @@ from pydantic import BaseModel, ValidationError
 
 class Config(BaseModel):
     window_title: str
+    process_name: str
     player_facing: dict
     game_state: dict
     keybinds: dict
     menu: dict
     collect: dict
     client: dict
+    boss_info: dict
 
 @lru_cache(maxsize=1)
 def load_config():

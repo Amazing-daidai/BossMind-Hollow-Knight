@@ -3,7 +3,7 @@ import torch
 from tqdm import tqdm
 
 from bossmind.learning.dataset import get_dataloader
-from bossmind.learning.actions import ACTION_KEY, PLAY_INFO, BOSS_INFO
+from bossmind.learning.actions import ACTION_KEY, PLAY_INFO, ENEMY_INFO, MAX_ENEMIES
 from bossmind.paths import MODEL_DIR
 
 
@@ -14,7 +14,7 @@ class BCPolicy:
         self.epochs = epochs
         self.batch_size = batch_size
         self._steps = None
-        self._input_dim = len(PLAY_INFO) + len(BOSS_INFO)
+        self._input_dim = len(PLAY_INFO) + len(ENEMY_INFO) * MAX_ENEMIES + MAX_ENEMIES
         self._output_dim = len(ACTION_KEY)
         self.model = None
 

@@ -9,7 +9,9 @@ using UnityEngine.SceneManagement;
 
 namespace BossMind.Mod
 {
-    // BossMind 观测 Mod：游戏内读玩家/敌人，UDP 推给 Python（当前约 1Hz）
+    // BossMind 观测 Mod：游戏内读玩家/敌人，UDP 推给 Python
+    // Find 0.5s / Send 90Hz 分计时（禁止每帧 FindObjectsOfType）
+    // Send 略高于采集 60Hz，抗抖动；实际上限是 HeroUpdate 频率（≈游戏帧率）
     public class BossMindMod : Mod
     {
         internal static BossMindMod Instance { get; private set; }
@@ -25,8 +27,12 @@ namespace BossMind.Mod
         private const int UdpPort = 28765;
         private UdpClient _udp;
 
-        // 上次刷新+发送的时间（Time.time，秒）
-        private float _lastLogTime;
+        // 双频率：Find 贵、Send 只读缓存。Send 90Hz（60～120 余量），采集仍 60Hz 读最新
+        private const float FindInterval = 0.5f;
+        private const float SendInterval = 1f / 90f;
+
+        // 上次寻找敌人和发送json的时间（Time.time，秒）
+        private float _lastFindTime, _lastSendTime;
 
         // 左上角 Mod 列表显示名
         public BossMindMod() : base("BossMind.Mod")
@@ -59,14 +65,18 @@ namespace BossMind.Mod
         private void OnHeroUpdate()
         {
             float now = Time.time;
-            if (now - _lastLogTime < 1f)
+            // Find：0.5s 刷新敌人列表
+            if (now - _lastFindTime >= FindInterval)
             {
-                return;
+                _lastFindTime = now;
+                RefreshEnemyCache();
             }
-
-            _lastLogTime = now;
-            RefreshEnemyCache(); // 贵
-            SendSnapshot(now);   // 读缓存 + UDP
+            // Send：90Hz 读缓存 + UDP（略高于采集；钩子不够快时实际 ≈ 帧率）
+            if (now - _lastSendTime >= SendInterval)
+            {
+                _lastSendTime = now;
+                SendSnapshot(now);  // UDP发送
+            }
         }
 
         // 低频刷新敌人列表
@@ -108,7 +118,7 @@ namespace BossMind.Mod
             public int soul;
             public float x;
             public float y;
-            public float facing;
+            public float facing;  // ±1，与 yaml player_facing / 游戏 localScale.x 一致
         }
 
         [Serializable]
@@ -118,7 +128,7 @@ namespace BossMind.Mod
             public float x;
             public float y;
             public string name;
-            public float facing;
+            public float facing;  // ±1；HealthManager 无 cState，用 localScale.x
         }
 
         // 整包，对应 Python read_latest() 的 dict
@@ -130,6 +140,13 @@ namespace BossMind.Mod
             public int gamestate;
             public PlayerDto player;
             public EnemyDto[] enemies;
+        }
+
+        // 游戏朝向是 float ±1（朝右 -1，朝左 +1，与 yaml right_value/left_value 相同）
+        // 不要把 cState.facingRight（bool）赋给 float，否则变成 1/0，Python 解不出
+        private static float FacingFromScale(Transform t)
+        {
+            return t.localScale.x < 0f ? -1f : 1f;
         }
 
         // hero/player 缺失时返回 null
@@ -147,7 +164,7 @@ namespace BossMind.Mod
                 soul = _player.MPCharge,
                 x = p.x,
                 y = p.y,
-                facing = _hero.cState.facingRight,  // 待实机确认
+                facing = FacingFromScale(_hero.transform),  // ±1，不用 cState.facingRight
             };
         }
 
@@ -176,7 +193,7 @@ namespace BossMind.Mod
                     x = p.x,
                     y = p.y,
                     name = hm.gameObject.name,
-                    facing = hm.cState.facingRight,  // 待实机确认
+                    facing = FacingFromScale(hm.transform),  // HM 无 cState，用 localScale.x → ±1
                 });
             }
 

@@ -49,12 +49,21 @@ def _fake_event(
     t_rel_ns: int,
     *,
     player_hp: int = 9,
-    boss_hp: int | None = 800,
+    enemy_hp: int | None = 800,
     is_battle: bool = True,
     held: dict[str, bool] | None = None,
     pressed: dict[str, bool] | None = None,
 ) -> dict:
-    """一帧假事件，字段对齐 schema 1.1.x。"""
+    """一帧假事件，字段对齐 schema 2.0.0。"""
+    enemies = [
+        {
+            "enemy_hp": enemy_hp,
+            "enemy_x": 40.0,
+            "enemy_y": 27.658,
+            "enemy_facing_right": False,
+            "name": "Hornet",
+        }
+    ]
     return {
         "t_ns": 1_000_000_000_000 + t_rel_ns,
         "t_rel_ns": t_rel_ns,
@@ -67,22 +76,14 @@ def _fake_event(
                 "player_x": 15.0 + frame_idx,
                 "player_y": 27.658,
                 "soul": 33,
-                "max_hp": 9,
                 "player_facing_right": True,
-                "player_on_ground": True,
             },
-            "boss": {
-                "boss_hp": boss_hp,
-                "boss_x": 40.0,
-                "boss_y": 27.658,
-                "boss_facing_right": False,
-                "boss_on_ground": True,
-            },
+            "enemies": enemies,
+            "n_enemies": len(enemies),
             "window_focused": True,
             "is_battle": is_battle,
             "scene_name": "GG_Hornet_1",
             "game_state": "PLAYING",
-            "read_error_streak": 0,
         },
         "key_states": {
             "held": held if held is not None else _keys_off(),
@@ -95,12 +96,12 @@ def _win_episode_events(eps_id: str) -> list[dict]:
     """一局假数据：开战 → 输出 → 战斗结束（供 end_reason=win）。"""
     attack = {**_keys_off(), "attack": True}
     return [
-        _fake_event(eps_id, 0, 0, boss_hp=800, is_battle=True),
+        _fake_event(eps_id, 0, 0, enemy_hp=800, is_battle=True),
         _fake_event(
             eps_id,
             1,
             20_000_000,
-            boss_hp=200,
+            enemy_hp=200,
             is_battle=True,
             held=attack,
             pressed=attack,
@@ -109,7 +110,7 @@ def _win_episode_events(eps_id: str) -> list[dict]:
             eps_id,
             2,
             40_000_000,
-            boss_hp=0,
+            enemy_hp=0,
             is_battle=False,
         ),
     ]
@@ -174,11 +175,12 @@ def test_write_fake_win_episode(writer: EpisodeWriter, tmp_path: Path):
     assert len(lines) == 3
 
     parsed = [json.loads(line) for line in lines]
-    assert parsed[0]["observation"]["boss"]["boss_hp"] == 800
+    assert parsed[0]["observation"]["enemies"][0]["enemy_hp"] == 800
+    assert parsed[0]["observation"]["n_enemies"] == 1
     assert parsed[0]["observation"]["is_battle"] is True
-    assert parsed[1]["observation"]["boss"]["boss_hp"] == 200
+    assert parsed[1]["observation"]["enemies"][0]["enemy_hp"] == 200
     assert parsed[1]["key_states"]["pressed"]["attack"] is True
-    assert parsed[2]["observation"]["boss"]["boss_hp"] == 0
+    assert parsed[2]["observation"]["enemies"][0]["enemy_hp"] == 0
     assert parsed[2]["observation"]["is_battle"] is False
 
     assert len(list((eps / "frames").glob("*.jpg"))) == 3

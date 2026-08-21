@@ -11,3 +11,5 @@ GAME_INFO_FILE = CONFIGS_DIR / "game_info.yaml"
 RAW_DATA_DIR = PROJECT_ROOT / "data" / "raw"
 
 MODEL_DIR = PROJECT_ROOT / "models"
+
+LOGS_DIR = PROJECT_ROOT / "logs"

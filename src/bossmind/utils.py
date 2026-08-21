@@ -1,8 +1,14 @@
 import hashlib
 import subprocess
 import ctypes
+import logging
+import pymem
 
-from bossmind.paths import GAME_INFO_FILE, PROJECT_ROOT
+from pathlib import Path
+
+from bossmind.paths import GAME_INFO_FILE, PROJECT_ROOT, LOGS_DIR
+
+_FORMAT = "%(asctime)s - %(name)s - %(levelname)s: %(message)s"
 
 # 获取当前git提交hash
 def git_sha() -> str:
@@ -49,6 +55,27 @@ def get_focused_window_pid():
     
     return pid.value
 
+def get_game_pid(process_name: str) -> int | None:
+    """获取游戏进程pid
+
+    Args:
+        process_name (str): 进程名称
+
+    Raises:
+        ValueError: 未找到进程
+        ValueError: 打开进程失败
+
+    Returns:
+        int | None: 进程pid
+    """
+    try:
+        pm = pymem.Pymem(process_name)
+    except pymem.exception.ProcessNotFound:
+        raise ValueError(f"未找到进程: {process_name}")
+    except pymem.exception.CouldNotOpenProcess:
+        raise ValueError(f"打开进程失败: {process_name}")
+    return pm.process_id
+
 # 判断窗口焦点是否在游戏上
 def is_window_focused(game_pid: int) -> bool:
     # 获取窗口pid
@@ -56,8 +83,35 @@ def is_window_focused(game_pid: int) -> bool:
     # 判断是否相同
     return window_pid is not None and window_pid == game_pid
 
+def setup_logging(path: Path, level: int = logging.INFO) -> None:
+    """设置日志配置，入口处设置一次即可
 
-
+    Args:
+        log_path (Path): 日志文件路径
+        level (int, optional): 日志级别. Defaults to logging.INFO.
+    """
+    # 获取根logger
+    root = logging.getLogger()
+    if root.handlers:
+        return  # 避免调两次叠出两份输出
+    # 创建文件夹
+    log_path = LOGS_DIR / path
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    # 设置日志级别
+    root.setLevel(level)
+    # 设置日志格式
+    fmt = logging.Formatter(_FORMAT)
+    # 终端输出handler
+    console_h = logging.StreamHandler()  # stderr，终端看得到
+    console_h.setFormatter(fmt)
+    console_h.setLevel(level)
+    # 文件输出handler
+    file_h = logging.FileHandler(log_path, encoding="utf-8", mode="a")
+    file_h.setFormatter(fmt)
+    file_h.setLevel(level)
+    # 添加handler
+    root.addHandler(console_h)
+    root.addHandler(file_h)
 
 if __name__ == "__main__":
     print(git_sha())

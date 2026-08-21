@@ -3,8 +3,9 @@ import time
 
 from bossmind.env_tools.input import InputController
 from bossmind.config import load_config
+from bossmind.utils import setup_logging
 
-logging.basicConfig(level=logging.WARNING)
+setup_logging("probe/probe_input.log", logging.DEBUG)
 
 def main():
     print("=" * 40)

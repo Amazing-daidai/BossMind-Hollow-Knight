@@ -219,6 +219,7 @@ data/raw/
 data/processed/
 artifacts/
 models/
+logs/
 !tests/fixtures/
 
 # Hollow Knight Mod (C#)

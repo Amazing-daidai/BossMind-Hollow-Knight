@@ -1,14 +1,14 @@
 import logging
 import time
 
-from bossmind.env_tools.memory import PlayerInfo
+from bossmind.env_tools.obs_map import ObservationMapper
 from bossmind.env_tools.input import InputController
 from bossmind.env_tools.reset_backends.menu import Menu
 from bossmind.env_tools.reset_backends.mod import Mod
 from bossmind.env_tools.mod_ipc import ModIpc
-from bossmind.data.schema import EnemyStates, Observation
+from bossmind.data.schema import Observation
 from bossmind.config import load_config
-from bossmind.utils import is_window_focused
+from bossmind.utils import is_window_focused, get_game_pid
 
 logger = logging.getLogger(__name__)
 
@@ -18,38 +18,41 @@ class GameSession:
     """
     def __init__(self, config):
         self._config = config
-        self._player_info = PlayerInfo(self._config)
         self._input_controller = InputController(self._config)
         self._menu = Menu(self._input_controller, self._config)
-        self._mod = Mod()
         self._ipc = ModIpc(self._config)
-        self._last_hp: int | None = None
-        self._hp_fail_streak: int = 0
+        self._mapper = ObservationMapper(self._config)
+        self._mod = Mod()
+        self._pid = None
 
 
     def attach(self):
         """
-        连接游戏进程
+        启动接收
         """
-        self._player_info.attach()
+        self._ipc.start()
+        self._pid = self._get_pid()
 
     def detach(self):
         """
-        断开游戏进程
+        停止接收
         """
-        self._player_info.detach()
+        self._ipc.stop()
+        self._pid = None
 
-    def get_pid(self):
+    def _get_pid(self):
         """
         获取游戏进程 id
         """
-        return self._player_info.get_pid()
+        return get_game_pid(self._config.process_name)
 
-    def get_is_battle(self):
+    def _get_data(self):
+        """获取mod发送的游戏数据
+
+        Returns:
+            dict: 游戏数据
         """
-        获取是否在战斗中
-        """
-        return self._player_info.get_is_battle()
+        return self._ipc.read_latest()
 
     def reset_game(self, method):
         """
@@ -78,35 +81,33 @@ class GameSession:
         """
         self._menu.quit_to_title()
 
+    def get_is_battle(self) -> bool:
+        """获取是否在战斗中
+
+        Returns:
+            bool: 是否在战斗中
+        """
+        obs = self.get_observation()
+        return bool(obs.is_battle)
+
     def get_observation(self) -> Observation:
         """
         获取游戏环境数据
         """
-        game_pid = self.get_pid()
-        window_focused = is_window_focused(game_pid)
-        player_states = self._player_info.get_player_states()
-        raw_hp = player_states.player_hp
-        if raw_hp is not None:
-            self._last_hp = raw_hp
-            self._hp_fail_streak = 0
-            player_states.player_hp = raw_hp
-        else:
-            self._hp_fail_streak += 1
-            player_states.player_hp = self._last_hp   # 用上一帧填充，可能失真，后续改。
-        boss_states = EnemyStates(boss_hp=self._player_info.get_boss_hp())
-        # scene_name / game_state / is_battle 来自 memory 派生；is_battle 需 PLAYING 且 boss_hp>0
-        observation = Observation(
-            player=player_states,
-            boss=boss_states,
-            is_battle=self.get_is_battle(),
-            window_focused=window_focused,
-            scene_name=self._player_info.get_scene_name(),
-            game_state=self._player_info.get_game_state(),
-            read_error_streak=self._hp_fail_streak,
-        )
+        window_focused = is_window_focused(self._pid)
+        data = self._get_data()
+        if data is None:
+            logger.warning("未收到游戏数据")
+            return Observation(
+                is_battle=False,
+                window_focused=window_focused
+            )
+        observation = self._mapper.udp_dict_to_observation(data, window_focused=window_focused)
         return observation
 
 if __name__ == "__main__":
     config = load_config()
     game_session = GameSession(config)
+    game_session.attach()
     game_session.get_observation()
+    game_session.detach()

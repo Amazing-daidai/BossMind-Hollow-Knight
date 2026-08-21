@@ -30,7 +30,6 @@ def main():
             print(
                 f"当前血量: {hp_after_reset}，"
                 f"是否与基线一致: {hp_after_reset == hp_baseline}，"
-                f"read_error_streak={obs.read_error_streak}"
             )
     except KeyboardInterrupt:
         print("退出")

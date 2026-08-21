@@ -5,18 +5,18 @@ SCHEMA_VERSION = "2.0.0"
 
 # 按键数据
 class ButtonStates(BaseModel):
-    left: bool = Field(default=False)
-    right: bool = Field(default=False)
-    up: bool = Field(default=False)
-    down: bool = Field(default=False)
-    jump: bool = Field(default=False)
-    attack: bool = Field(default=False)
-    dash: bool = Field(default=False)
-    super_dash: bool = Field(default=False)
-    dream_knife: bool = Field(default=False)
-    heal: bool = Field(default=False)
-    skill: bool = Field(default=False)
-    tab: bool = Field(default=False)
+    left: bool = False
+    right: bool = False
+    up: bool = False
+    down: bool = False
+    jump: bool = False
+    attack: bool = False
+    dash: bool = False
+    super_dash: bool = False
+    dream_knife: bool = False
+    heal: bool = False
+    skill: bool = False
+    tab: bool = False
 
 class KeyStates(BaseModel):
     held: ButtonStates = Field(default_factory=ButtonStates)
@@ -40,8 +40,8 @@ class EnemyStates(BaseModel):
 
 # 游戏数据
 class Observation(BaseModel):
-    player: PlayerStates
-    enemies: list[EnemyStates]
+    player: PlayerStates | None = None
+    enemies: list[EnemyStates] | None = None
     n_enemies: int | None = None
     window_focused: bool | None = None
     is_battle: bool | None = None
@@ -50,11 +50,11 @@ class Observation(BaseModel):
 
 # 整体记录内容
 class EventRecord(BaseModel):
-    t_ns: int = Field(...)  # 绝对时间
-    t_rel_ns: int = Field(...)  # 相对时间
-    lag_ns: int = Field(...)  # 采集滞后
-    frame_idx: int = Field(...)
-    eps_id: str = Field(...)
+    t_ns: int  # 绝对时间
+    t_rel_ns: int  # 相对时间
+    lag_ns: int  # 采集滞后
+    frame_idx: int 
+    eps_id: str 
     observation: Observation
     key_states: KeyStates
 
@@ -70,19 +70,19 @@ class MetaData(BaseModel):
     started_at_unix_ns: int | None = None  # 开始时间
     code_git_sha: str = "unknown"  # git hash
     config_hash: str = "unknown"  # 配置hash
-    eps_id: str = Field(...)
-    batch_id: str = Field(...)
-    duration: float = Field(...)
+    eps_id: str 
+    batch_id: str 
+    duration: float 
     sample_hz_nominal: int | None = None  # 采样率
     sample_hz_measured: float | None = None  # 实际采样率
     dt_p50_ns: int | None = None 
     dt_p95_ns: int | None = None
-    n_dropped: int = Field(...)
-    image_dropped: int = Field(...)
+    n_dropped: int 
+    image_dropped: int 
     end_reason: Literal["win","death","aborted","error","timeout","discard"]
     boss: str
-    n_events: int = Field(...)
-    n_frames: int = Field(...)
+    n_events: int 
+    n_frames: int 
     vision_hz: float | None = None  # 图像采样率
     vision_region: dict | None = None
     vision_format: str | None = None  # 图像采集格式

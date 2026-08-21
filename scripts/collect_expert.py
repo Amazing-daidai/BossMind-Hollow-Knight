@@ -24,7 +24,7 @@ class CollectExpert:
 
     def _pre_collect(self):
         """
-        收集前的准备，连接进程，准备写入器，打开键盘监听
+        收集前的准备，启动接收，准备写入器，打开键盘监听
         """
         print("请确认打开游戏并已经加载存档")
         print("请按下F11键确认")
@@ -37,10 +37,8 @@ class CollectExpert:
                 print("键盘监听已停止，终止收集")
                 return False
             time.sleep(0.1)
-        # 连接进程
+        # 启动接收
         self._session.attach()
-        # 先解析一次地址链
-        self._session.get_observation()
         # 先校验窗口，再开写盘线程，避免 pre_write 后找窗失败泄漏线程
         self._vision.pre_capture()
         # 创建写入器
@@ -83,8 +81,6 @@ class CollectExpert:
         MAX_FOCUS_LOST = c["max_focus_lost"]
         # 失焦数
         n_loss = 0
-        # 最大HP读取失败次数
-        MAX_HP_READ_FAIL = c["max_hp_read_fail"]
         # 最大持续时间
         MAX_DURATION_NS = int(c["max_episode_s"] * 1e9)
         # 图像采集间隔
@@ -198,7 +194,8 @@ class CollectExpert:
                     self._end_reason = "aborted"
                     break
                 # 死亡
-                if observation.player.player_hp is not None and observation.player.player_hp <= 0:
+                player = observation.player
+                if player is not None and player.player_hp is not None and player.player_hp <= 0:
                     self._end_reason = "death"
                     break
                 # 超时
@@ -217,10 +214,6 @@ class CollectExpert:
                         break
                 else:
                     n_loss = 0
-                # 内存读取失败过多
-                if observation.read_error_streak >= MAX_HP_READ_FAIL:
-                    self._end_reason = "discard"
-                    break
                 # 胜利
                 if not observation.is_battle:
                     false_streak += 1

@@ -3,7 +3,6 @@ import json
 import threading
 import logging
 
-from bossmind.config import load_config
 
 logger = logging.getLogger(__name__)
 
@@ -21,8 +20,7 @@ class ModIpc:
         self._running = False
 
     def start(self):
-        """启动接收数据线程
-        """
+        """启动接收数据线程"""
         if self._running:
             return
         # 创建socket套接字
@@ -38,14 +36,13 @@ class ModIpc:
         self._thread = threading.Thread(target=self._recv_loop, daemon=True)
         self._thread.start()
 
-
     def _recv_loop(self):
         while self._running:
             try:
                 data, addr = self.sock.recvfrom(65535)
             except socket.timeout:
                 continue
-            except OSError:          # stop 时 close 可能触发
+            except OSError:  # stop 时 close 可能触发
                 break
             self._update_latest(data)
 
@@ -70,8 +67,7 @@ class ModIpc:
             return
 
     def stop(self):
-        """停止接收并清理缓存
-        """
+        """停止接收并清理缓存"""
         self._running = False
 
         if self.sock is not None:
@@ -86,7 +82,6 @@ class ModIpc:
         self._thread = None
         with self._lock:
             self._latest = None
-
 
     def read_latest(self):
         """返回状态快照
